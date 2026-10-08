@@ -4,7 +4,8 @@ Esta infraestructura prepara el backend, Supabase Auth local y herramientas Flut
 **La validación todavía es parcial y no hay aprobación para integrar en main.**
 El adaptador resuelve la publicación loopback en Docker Desktop 4.55.0. El driver real
 de Auth/MFA/persistencia y Alembic pasa, y la base Trixie conserva Python y el lockfile.
-Trivy sigue en FAIL por ocho CVEs Debian (44 HIGH); Android y CI permanecen pendientes.
+Trivy sigue en FAIL por ocho CVEs Debian (44 HIGH); Android permanece pendiente y
+el CI Docker global falla por ese gate, aunque las pruebas Linux funcionales pasan.
 Consulta [el informe vigente](docker-closeout.md),
 [los riesgos pendientes](docker-security-risk-register.md) y
 [la validación inicial](docker-validation.md). Conserva el preflight habilitado.
@@ -14,8 +15,8 @@ Consulta [el informe vigente](docker-closeout.md),
 - Hosts objetivo: Windows x64 con Git Bash y Docker Desktop usando contenedores Linux/WSL2,
   y Linux x86_64 con Docker Engine. Backend, Supabase y Flutter tools se comprobaron en Windows.
   El adaptador tiene pruebas ejecutadas en Windows y Linux; el flujo completo en un host
-  Linux es objetivo del CI Ubuntu 24.04 amd64, todavía no
-  ejecutado. ARM, macOS e iOS no están validados.
+  Linux también pasó en GitHub Actions Ubuntu 24.04 amd64. El gate de seguridad
+  continúa fallando; esos resultados no aprueban el entorno completo. ARM, macOS e iOS no están validados.
 - Git, Bash y Docker Compose v2. El equipo de desarrollo tiene cliente Docker 29.1.3,
   Compose 2.40.3 y WSL 2.6.3. La CLI Supabase autónoma se descarga en `.tools/`;
   no necesita Node/npm ni instalación global. Git Bash debe incluir curl, unzip,
@@ -66,6 +67,8 @@ En Windows, ejecútalos en **Git Bash**, no en el `bash.exe` de WSL por accident
 ```bash
 git clone https://github.com/ferjovel06/agrifos.git
 cd agrifos
+# Antes de integrar el PR, usar su rama publicada:
+git switch --track origin/chore/docker-environment
 docker version
 docker compose version
 bash scripts/docker-dev.sh prepare
@@ -335,6 +338,9 @@ con `config --quiet` y revisión de los bindings, perfiles, montajes y variables
 El escáner conserva los informes anteriores en `history/` y verifica el digest de configuración
 del archivo exportado contra el informe actual. Ejecuta los escaneos secuencialmente:
 comparten `.tools/trivy-cache` y Trivy bloquea su caché durante un análisis.
+CI conserva durante 30 días el artifact backend-scanner-summary, incluso cuando el gate
+falla. Solo contiene CVEs, paquetes/versiones, contadores y digest; omite matches de
+secretos, configuración Env y mensajes crudos. No cambia la condición de fallo.
 
 Trixie ya es la base normal adoptada tras la comparación documentada. El helper
 `bash scripts/evaluate-trixie.sh` y sus modos `test`, `scan`, `integration` conservan

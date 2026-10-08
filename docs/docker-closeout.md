@@ -3,7 +3,8 @@
 Fecha: 2026-10-08. Rama: `chore/docker-environment`.
 **Estado: INCOMPLETO. No se recomienda merge.** Alembic y la integración real están
 resueltos; Trixie fue adoptada bajo autorización. Trivy continúa en FAIL, y la
-aceptación personal de Android sigue pendiente. La entrega GitHub se prepara como Draft.
+aceptación personal de Android sigue pendiente. El
+[PR #76](https://github.com/ferjovel06/agrifos/pull/76) está publicado como Draft.
 
 Este documento sustituye los estados vigentes de los informes anteriores, que se
 conservan como evidencia histórica. [Guía operativa](docker.md) y
@@ -113,7 +114,7 @@ La compatibilidad de compilación final sigue NOT RUN hasta la revisión humana 
 
 ## Validación local y evidencia
 
-Host: Windows x64/Git Bash/Docker Desktop 4.55.0, Engine 29.1.3 y Compose 2.40.3.
+Host: Windows 11 Pro x64/Git Bash/Docker Desktop 4.55.0, Engine 29.1.3 y Compose 2.40.3.
 Se usó `git archive 4474762` en `.docker/closeout clean-c8/`: solo archivos versionados,
 sin env personales, claves, .venv, SDK nativo ni .tools. Docker reutilizó capas verificadas;
 no se afirma construcción bit a bit idéntica ni desde caché vacía. La CLI se descargó
@@ -126,7 +127,7 @@ de volúmenes nuevo `agrifos-closeout-clean`, restaurando con --enforce-lockfile
 | Backend Bookworm / Trixie evaluada | PASS, 133 cada uno | backend-bookworm.txt, backend-trixie.txt |
 | Build Trixie desde Git archive con espacios | PASS, test/development/runtime | clean-build.txt, clean-checkout-ref.txt |
 | Backend checkout limpio | PASS, 133 | clean-backend-tests.txt |
-| Infraestructura antes/después de regresiones de escaneo | PASS, 34 / 37 | clean-infrastructure.txt, infrastructure-final.txt |
+| Infraestructura antes/después de regresiones de escaneo | PASS, 34 / 37 / 39 | clean-infrastructure.txt, infrastructure-final.txt |
 | Regresiones de identidad Windows nativo | PASS, 3 | scan-proof-native.txt |
 | Adaptador Windows / Linux amd64 en contenedor | PASS, 10 principales cada uno, con subcasos | clean-integration.txt, adapter-linux.txt |
 | Compose quiet, Bash y Hadolint | PASS, advertencias documentadas | static.txt |
@@ -151,7 +152,7 @@ de volúmenes nuevo `agrifos-closeout-clean`, restaurando con --enforce-lockfile
 | Secretos y misconfiguración runtime en alcance Trivy | PASS, cero hallazgos HIGH/CRITICAL | scanners/trivy-runtime.json |
 | Flutter analyze y tests checkout limpio | PASS, sin issues y 83 tests | clean-flutter-analyze.txt, clean-flutter-tests.txt |
 | Licencias humanas, instalación SDK/NDK y APK debug | NOT RUN, esperando al usuario | comprobación de licencia ausente |
-| Host Linux independiente y GitHub Actions | NOT RUN aún; entrega Draft prevista | estado remoto pendiente |
+| Host Linux x86_64 en GitHub Actions, backend/Flutter/integración | PASS funcional; FAIL gate Trivy | runs 37856180080 y 37856180194, commit 5480688 |
 | Android emulador/ADB/USB/sensor, Studio opcional | NOT RUN en esta fase | no se presume hardware ni LAN |
 
 Los ensayos fallidos se conservan: fixture inicial de metadata con atributo incorrecto,
@@ -162,6 +163,29 @@ y usuarios sintéticos de los proyectos de prueba. El contenedor ajeno observado
 La prueba runtime reutilizó la instancia propia retenida y un override temporal extra_hosts
 solo para dirigir el alias api del driver al contenedor api-runtime en su misma red.
 No hubo proxy, servicio adicional ni cambio de DNS/global del host.
+Trivy filesystem también examinó el archivo Git de los archivos versionados antes del push:
+PASS, cero hallazgos de secretos HIGH/CRITICAL; trivy-tracked-secrets.json conserva el resultado.
+
+## GitHub Actions Linux
+
+Los dos workflows se ejecutaron realmente sobre `5480688` en el PR Draft:
+
+| Job | Estado | Evidencia remota |
+|---|---|---|
+| Backend tests, nativo | PASS, 133 | [CI](https://github.com/ferjovel06/agrifos/actions/runs/37856180080) |
+| Flutter checks, nativo | PASS, analyze/tests | mismo run CI |
+| Backend Docker, build/unit/infra | PASS: build, 133 backend y 37 infraestructura; job global FAIL por Trivy, config=0/image=1/identity=0 | [Docker environment](https://github.com/ferjovel06/agrifos/actions/runs/37856180194) |
+| Supabase Auth, migraciones y persistencia | PASS, Linux Ubuntu 24.04 x86_64; bindings, JWT negativos, MFA, Alembic y reinicio reales | mismo run Docker |
+| Flutter Linux amd64 Docker | PASS, 83 tests y locks conservados | mismo run Docker |
+| Android CI | NOT RUN, licencia humana preservada | límite explícito del job Flutter |
+
+Se descargaron los logs de jobs completados a ci-5480688-*.log en la evidencia privada.
+La siguiente mejora conserva también un artifact `backend-scanner-summary` durante 30 días,
+con CVEs/paquetes/versiones, contadores y digest, incluso ante FAIL. Omite matches de
+secretos, Env, mensajes y cuerpos crudos; dos regresiones protegen esa selección y
+evitan informar cero hallazgos cuando falta un reporte. Las pruebas locales pasan 39.
+El paso Trivy y su fallo obligatorio permanecen intactos. El artifact usa upload-artifact
+7.0.2 por commit oficial `cf430e030ddbb5b0abf93d22962f4752f3646cd9`.
 
 ## Comandos de uso
 
@@ -234,6 +258,7 @@ ignorado por Git. No se modifica ni distribuye firma release.
 | Adoptar base Trixie | backend/Dockerfile, scripts/evaluate-trixie.sh, test-docker-integration.sh | 4474762 |
 | Corregir prueba de identidad concurrente | scripts/check-docker.sh, docker/tests/test_scan_identity.py | 630fd8d |
 | Guía, estados históricos, cierre y riesgos | README.md, docs/docker*.md | commit de documentación de esta entrega |
+| Evidencia CI sanitizada y resultados Linux | .github/workflows/docker.yml, docker/scan_summary.py, tests/test_scan_summary.py, guía/informe | commit de evidencia CI de esta entrega |
 
 Los 15 commits previos se preservan. Manifiestos/locks no se regeneraron en esta fase,
 ni se reorganizaron backend/Flutter/tests. Los datos locales, herramientas descargadas,
@@ -241,11 +266,12 @@ credenciales, claves y artefactos generados están ignorados y no forman parte d
 
 ## Entrega y bloqueantes
 
-La autorización permite publicar únicamente chore/docker-environment y abrir PR Draft
-hacia main. No hay autorización de merge ni despliegue. El PR debe conservar los fallos
-Trivy visibles y enlazar este registro; sus checks Linux se verifican al publicarse.
+Se publicó chore/docker-environment y se abrió el PR #76 Draft hacia main; el árbol Git
+quedó limpio tras los commits y el push. No hubo merge ni despliegue. Los fallos Trivy
+permanecen visibles y los checks Linux funcionales se ejecutaron realmente.
 
 Bloqueantes: ocho CVEs Debian sin corrección Trixie aceptada; revisión humana de Android
-y APK pendiente; comprobaciones Linux/CI aún por ejecutar en GitHub. La credencial Git
+y APK pendiente. Linux funcional ya está comprobado mediante GitHub Actions;
+el workflow global Docker permanece FAIL por seguridad. La credencial Git
 existente tiene permiso push y se puede usar temporalmente con gh, sin imprimirla ni
 guardar tokens en el checkout o cambiar la configuración global de autenticación.

@@ -82,6 +82,20 @@ jobs:
       - name: Scan the built runtime and Docker configuration
         run: bash scripts/check-docker.sh images
 
+      - name: Preserve a public scanner summary even when the strict gate fails
+        if: always()
+        run: python3 docker/scan_summary.py .docker/evidence/scanners .docker/evidence/ci/public-scanner-summary.json
+
+      - name: Upload the sanitized scanner summary
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: backend-scanner-summary
+          path: .docker/evidence/ci/public-scanner-summary.json
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 30
+
   local-integration:
     name: Isolated Supabase Auth, migrations and persistence
     runs-on: ubuntu-24.04
