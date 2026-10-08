@@ -4,4 +4,6 @@
          to allow setting breakpoints, to provide hot reload, etc.
     -->
     <uses-permission android:name="android.permission.INTERNET"/>
+    <!-- Local Docker/Supabase endpoints use HTTP. This applies to debug only. -->
+    <application android:usesCleartextTraffic="true" />
 </manifest>

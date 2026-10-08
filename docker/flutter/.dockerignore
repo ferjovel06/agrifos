@@ -1,0 +1,5 @@
+# The Flutter build context is docker/flutter, never the host's SDK/project.
+*
+!Dockerfile
+!entrypoint.sh
+!client.env.example
