@@ -13,10 +13,14 @@ mkdir -p "$evaluation_dir"
 candidate='python:3.13.16-slim-trixie@sha256:bf44cdfcb76cd3b41e879bc058fc37ec5872002ccfde7fcb765e218cde0cd79c'
 case "$mode" in
   build)
-    # Fail if the reviewed baseline changes; only substitute its single base line.
+    # Retain the isolated workflow after adoption; reject any unreviewed base.
     baseline='FROM python:3.13.16-slim-bookworm@sha256:a1165e272e578941b84abc79e4ab38a0305cd12803a5c4247979ac7655f4d641 AS base'
-    [[ "$(tr -d '\r' < backend/Dockerfile | grep -Fxc "$baseline")" == 1 ]] || exit 1
-    tr -d '\r' < backend/Dockerfile | sed "s#^$baseline\$#FROM $candidate AS base#" > "$evaluation_dir/Dockerfile"
+    if [[ "$(tr -d '\r' < backend/Dockerfile | grep -Fxc "$baseline")" == 1 ]]; then
+      tr -d '\r' < backend/Dockerfile | sed "s#^$baseline\$#FROM $candidate AS base#" > "$evaluation_dir/Dockerfile"
+    else
+      [[ "$(tr -d '\r' < backend/Dockerfile | grep -Fxc "FROM $candidate AS base")" == 1 ]] || exit 1
+      tr -d '\r' < backend/Dockerfile > "$evaluation_dir/Dockerfile"
+    fi
     for target in test development runtime; do
       docker build --file "$(native_path "$evaluation_dir/Dockerfile")" --target "$target" \
         --tag "agrifos-backend-evaluation:trixie-$target" "$(native_path "$repo_root/backend")"

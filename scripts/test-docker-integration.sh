@@ -6,11 +6,11 @@ export MSYS_NO_PATHCONV=1
 native_path() {
   case "$(uname -s)" in MINGW*|MSYS*) cygpath -w "$1" ;; *) printf '%s\n' "$1" ;; esac
 }
-variant="${AGRIFOS_INTEGRATION_VARIANT:-bookworm}"
+variant="${AGRIFOS_INTEGRATION_VARIANT:-current}"
 compose_files=(--file "$(native_path "$repo_root/compose.yaml")")
 test_image=agrifos-backend:test
 case "$variant" in
-  bookworm) ;;
+  current) ;;
   trixie)
     mkdir -p .docker/evaluation
     cat > .docker/evaluation/compose-trixie.yaml <<'YAML'
@@ -32,7 +32,7 @@ compose() { docker compose --project-directory "$(native_path "$repo_root")" "${
 docker info >/dev/null
 [[ -x .tools/supabase/supabase.exe ]] && cli=.tools/supabase/supabase.exe || cli=.tools/supabase/supabase
 [[ -x "$cli" ]] || { printf 'Install the pinned local CLI first.\n' >&2; exit 1; }
-if [[ "$variant" == bookworm ]]; then compose build backend-unit api migrate; fi
+if [[ "$variant" == current ]]; then compose build backend-unit api migrate; fi
 test_id="agrifos-it-$(od -An -N4 -tx1 /dev/urandom | tr -d ' \n')"
 export AGRIFOS_ENV_DIR=".docker/integration/$test_id"
 export AGRIFOS_NETWORK="$test_id"
