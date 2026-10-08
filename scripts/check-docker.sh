@@ -107,7 +107,8 @@ check_lint() {
 
 check_images() {
   command -v docker >/dev/null 2>&1 || fail 'Docker CLI and a running Linux daemon are required.'
-  local runtime_image=agrifos-backend:runtime runtime_id runtime_platform
+  local runtime_image="${AGRIFOS_SCAN_IMAGE:-agrifos-backend:runtime}" runtime_id runtime_platform
+  case "$runtime_image" in agrifos-backend:runtime|agrifos-backend-evaluation:trixie-runtime) ;; *) fail 'Only the Agrifos runtime and isolated Trixie evaluation image can be scanned.' ;; esac
   if ! runtime_id="$(docker image inspect --format '{{.Id}}' "$runtime_image")"; then
     printf 'NOT RUN: build the backend runtime first: docker compose build migrate.\n' >&2
     exit 3
@@ -115,6 +116,7 @@ check_images() {
   runtime_platform="$(docker image inspect --format '{{.Os}}/{{.Architecture}}' "$runtime_image")"
   [[ "$runtime_platform" == linux/amd64 ]] || fail 'Image scanning currently supports a Linux amd64 backend runtime.'
   local evidence_dir="$repo_root/.docker/evidence/scanners"
+  if [[ "$runtime_image" == agrifos-backend-evaluation:trixie-runtime ]]; then evidence_dir+="-trixie"; fi
   local cache_dir="$repo_root/.tools/trivy-cache"
   mkdir -p "$evidence_dir" "$cache_dir"
   [[ "$(cd "$evidence_dir" && pwd -P)" == "$evidence_dir" ]] || fail 'Scanner evidence must stay inside this checkout.'
