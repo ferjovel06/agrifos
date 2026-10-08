@@ -1,0 +1,5 @@
+# Fail on errors. Warnings remain visible, including DL3008 for Ubuntu apt
+# packages obtained from maintained repositories rather than a frozen snapshot.
+failure-threshold: error
+no-color: true
+disable-ignore-pragma: true

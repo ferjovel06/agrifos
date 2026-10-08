@@ -1,0 +1,138 @@
+name: Docker environment
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - backend/**
+      - app_flutter/**
+      - supabase/**
+      - docker/**
+      - scripts/**
+      - compose.yaml
+      - .hadolint.yaml
+      - .gitignore
+      - .gitattributes
+      - .github/workflows/**
+  push:
+    branches: [main]
+    paths:
+      - backend/**
+      - app_flutter/**
+      - supabase/**
+      - docker/**
+      - scripts/**
+      - compose.yaml
+      - .hadolint.yaml
+      - .gitignore
+      - .gitattributes
+      - .github/workflows/**
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: docker-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  backend-container:
+    name: Backend image, unit tests and security checks
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+
+      - name: Check Linux amd64 and Docker client/server
+        run: |
+          test "$(uname -m)" = x86_64
+          docker version
+          docker compose version
+
+      - name: Validate configuration, Bash scripts and Dockerfiles
+        run: bash scripts/check-docker.sh static
+
+      - name: Build backend targets from the clean checkout
+        run: docker compose build backend-unit migrate
+
+      - name: Report effective Python and uv versions
+        run: |
+          docker run --rm --network none agrifos-backend:runtime python --version
+          docker compose run --rm --no-deps -T backend-unit uv --version
+
+      - name: Run the native backend unittest entry point in Docker
+        run: |
+          mkdir -p .docker/evidence/ci
+          docker compose run --rm --no-deps -T backend-unit 2>&1 | tee .docker/evidence/ci/backend-unit.log
+          grep -Eq '^Ran [1-9][0-9]* tests? in ' .docker/evidence/ci/backend-unit.log
+
+      - name: Run infrastructure unittest checks separately
+        run: |
+          docker compose run --rm --no-deps -T backend-unit python -m unittest discover -s /checks/tests -v 2>&1 | tee .docker/evidence/ci/infrastructure-unit.log
+          grep -Eq '^Ran [1-9][0-9]* tests? in ' .docker/evidence/ci/infrastructure-unit.log
+
+      - name: Scan the built runtime and Docker configuration
+        run: bash scripts/check-docker.sh images
+
+  local-integration:
+    name: Isolated Supabase Auth, migrations and persistence
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+
+      - name: Check Linux amd64 and Docker client/server
+        run: |
+          test "$(uname -m)" = x86_64
+          docker version
+          docker compose version
+
+      - name: Install the checksum-verified repository-local Supabase CLI
+        run: bash scripts/install-supabase.sh
+
+      - name: Exercise real local Auth, migration and restart persistence
+        run: bash scripts/test-docker-integration.sh
+
+  flutter-tools:
+    name: Flutter analysis and tests in Linux amd64 Docker
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+
+      - name: Check Linux amd64 and Docker client/server
+        run: |
+          test "$(uname -m)" = x86_64
+          docker version
+          docker compose version
+
+      - name: Build tools and report the pinned Flutter, Dart and JDK
+        run: bash scripts/flutter-container.sh version
+
+      - name: Analyze Flutter using the preserved lockfile
+        run: bash scripts/flutter-container.sh analyze
+
+      - name: Run Flutter tests using the preserved lockfile
+        run: bash scripts/flutter-container.sh test
+
+      - name: Confirm tracked locks and application files did not change
+        run: git diff --exit-code -- backend/uv.lock app_flutter/pubspec.lock app_flutter/lib app_flutter/android
+
+      - name: Report the Android validation boundary
+        run: |
+          printf '%s\n' 'NOT RUN: Android SDK provisioning and APK compilation require explicit interactive SDK license acceptance.'
+          printf '%s\n' 'The tools job does not accept Android licenses, start an emulator or claim USB/sensor validation.'
