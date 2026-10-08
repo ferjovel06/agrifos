@@ -1,6 +1,7 @@
 import uuid
 from datetime import datetime
 from enum import Enum
+from typing import Literal
 
 from pydantic import BaseModel, Field, model_validator
 
@@ -70,6 +71,7 @@ class SoilAssessmentInput(BaseModel):
 
 
 class FertilizationRecommendationRequest(BaseModel):
+    include_organic: bool = False
     parcel_id: uuid.UUID
     target_yield: float | None = Field(default=None, gt=0)
     yield_unit: YieldUnit
@@ -119,12 +121,48 @@ class ApplicationRead(BaseModel):
     products: list[ProductDoseRead]
 
 
+class OrganicCandidateDoseRead(BaseModel):
+    product_key: str
+    product: str
+    unit: Literal["kg", "L"]
+    quantity_ha: float = Field(ge=0, allow_inf_nan=False)
+    quantity_manzana: float = Field(ge=0, allow_inf_nan=False)
+    quantity_plant: float = Field(ge=0, allow_inf_nan=False)
+    plant_unit: Literal["g", "mL"]
+    concentration_kg_per_unit: dict[str, float]
+    nutrient_contributions_kg_ha: dict[str, float]
+
+
+class OrganicScenarioRead(BaseModel):
+    state: Literal["partial", "reference_only"]
+    model_version: str
+    profile_version: str
+    can_apply: Literal[False] = False
+    candidates: list[OrganicCandidateDoseRead]
+    total_contributions_kg_ha: dict[str, float]
+    equivalent_contributions_kg_ha: dict[str, float] | None = None
+    reference_shortfall_kg_ha: dict[str, float]
+    reference_surplus_kg_ha: dict[str, float]
+    reason_codes: list[str]
+    notices: list[str]
+    sources: list[str]
+
+
 class FertilizerScenarioRead(BaseModel):
     name: str
     selection_method: str
     is_mathematically_valid: bool
     products: list[ProductDoseRead]
     application_schedule: list[ApplicationRead]
+    organic: OrganicScenarioRead | None = None
+
+    @model_validator(mode="after")
+    def reference_has_no_executable_doses(self):
+        if self.organic is not None and (
+            self.products or self.application_schedule or self.is_mathematically_valid
+        ):
+            raise ValueError("Organic references cannot contain executable doses.")
+        return self
 
 
 class FertilizationRecommendationRead(BaseModel):

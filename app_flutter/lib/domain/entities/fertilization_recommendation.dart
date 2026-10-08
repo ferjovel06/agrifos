@@ -110,6 +110,65 @@ class FertilizerApplication {
       _sourceFor(products, nutrient);
 }
 
+class OrganicCandidateDose {
+  const OrganicCandidateDose({
+    required this.product,
+    required this.unit,
+    required this.quantityHa,
+    required this.quantityManzana,
+    required this.quantityPlant,
+    required this.plantUnit,
+  });
+  final String product;
+  final String unit;
+  final double quantityHa;
+  final double quantityManzana;
+  final double quantityPlant;
+  final String plantUnit;
+
+  factory OrganicCandidateDose.fromJson(Map<String, dynamic> json) =>
+      OrganicCandidateDose(
+        product: json['product'] as String,
+        unit: json['unit'] as String,
+        quantityHa: (json['quantity_ha'] as num).toDouble(),
+        quantityManzana: (json['quantity_manzana'] as num).toDouble(),
+        quantityPlant: (json['quantity_plant'] as num).toDouble(),
+        plantUnit: json['plant_unit'] as String,
+      );
+}
+
+class OrganicScenario {
+  const OrganicScenario({
+    required this.state,
+    required this.candidates,
+    required this.totalContributions,
+    required this.shortfall,
+    required this.notices,
+  });
+  final String state;
+  final List<OrganicCandidateDose> candidates;
+  final Map<String, double> totalContributions;
+  final Map<String, double> shortfall;
+  final List<String> notices;
+
+  // This implementation handles reference evaluation only.
+  bool get canApply => false;
+  factory OrganicScenario.fromJson(Map<String, dynamic> json) {
+    Map<String, double> numbers(String field) => (json[field] as Map).map(
+      (k, v) => MapEntry(k.toString(), (v as num).toDouble()),
+    );
+    return OrganicScenario(
+      state: json['state'] as String,
+      candidates: (json['candidates'] as List)
+          .map((v) => OrganicCandidateDose.fromJson(v as Map<String, dynamic>))
+          .toList(),
+      totalContributions: numbers('total_contributions_kg_ha'),
+      shortfall: numbers('reference_shortfall_kg_ha'),
+      notices: (json['notices'] as List).cast<String>(),
+    );
+  }
+}
+
 class FertilizerScenario {
   const FertilizerScenario({
     required this.name,
@@ -117,6 +176,7 @@ class FertilizerScenario {
     this.isMathematicallyValid = true,
     required this.products,
     this.applicationSchedule = const [],
+    this.organic,
   });
 
   final String name;
@@ -124,6 +184,7 @@ class FertilizerScenario {
   final bool isMathematicallyValid;
   final List<FertilizerProductDose> products;
   final List<FertilizerApplication> applicationSchedule;
+  final OrganicScenario? organic;
 
   factory FertilizerScenario.fromJson(Map<String, dynamic> json) {
     return FertilizerScenario(
@@ -131,6 +192,9 @@ class FertilizerScenario {
       selectionMethod: json['selection_method'] as String? ?? '',
       isMathematicallyValid: json['is_mathematically_valid'] as bool? ?? true,
       products: _productList(json['products']),
+      organic: json['organic'] == null
+          ? null
+          : OrganicScenario.fromJson(json['organic'] as Map<String, dynamic>),
       applicationSchedule:
           (json['application_schedule'] as List<dynamic>? ?? const [])
               .map(

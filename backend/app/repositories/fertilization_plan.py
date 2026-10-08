@@ -88,6 +88,11 @@ async def create_fertilization_plan(
         raise
 
     for scenario in recommendation.fertilizer_scenarios:
+        if scenario.organic is not None:
+            # Bibliographic candidates live in the snapshot, never kg items.
+            if scenario.application_schedule or scenario.products:
+                raise ValueError("Organic reference scenarios cannot contain executable doses.")
+            continue
         for application in scenario.application_schedule:
             for dose in application.products:
                 product = config.products.get(dose.product_key)
