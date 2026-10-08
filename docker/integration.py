@@ -70,6 +70,31 @@ def database_check(user_id):
             assert str(cursor.fetchone()[0]) == user_id, "Auth profile trigger did not persist a profile"
 
 
+def reject_invalid_claims(token):
+    # Only the freshly generated key for this isolated test project is mounted.
+    # Use a valid local signature so claim failures cannot be masked by bad crypto.
+    header = jwt.get_unverified_header(token)
+    keys = json.loads(Path("/test-signing-keys.json").read_text(encoding="utf-8"))
+    if isinstance(keys, dict):
+        keys = keys.get("keys", [keys])
+    matching = [key for key in keys if key.get("kid") == header["kid"]]
+    assert len(matching) == 1, "Missing isolated test signing key"
+    jwk = matching[0]
+    assert jwk.get("kty") == "EC" and jwk.get("alg") == "ES256" and "d" in jwk
+    signing_key = jwt.PyJWK.from_dict(jwk).key
+    claims = jwt.decode(token, options={"verify_signature": False})
+    for change in (
+        {"aud": "unauthorized-audience"},
+        {"iss": "https://unauthorized.example/auth/v1"},
+        {"exp": int(time.time()) - 60},
+    ):
+        invalid = jwt.encode({**claims, **change}, signing_key, algorithm="ES256", headers={"kid": header["kid"]})
+        api_check(invalid, 401)
+    api_check(jwt.encode(claims, "isolated-test-only-hmac-key-32-bytes", algorithm="HS256", headers={"kid": header["kid"]}), 401)
+    api_check("malformed-token", 401)
+    print("PASS: real API rejects signed ES256 tokens with wrong audience/issuer/expiry, HS256 and malformed tokens.")
+
+
 def totp(secret):
     key = base64.b32decode(secret.upper() + "=" * (-len(secret) % 8))
     digest = hmac.new(key, struct.pack(">Q", int(time.time()) // 30), hashlib.sha1).digest()
@@ -91,6 +116,7 @@ def initial():
     token = login(state)
     assert jwt.get_unverified_header(token)["alg"] == "ES256", "Auth did not issue ES256"
     assert api_check(token, 200)["id"] == state["id"]
+    reject_invalid_claims(token)
     api_check(None, 401)
     parts = token.split(".")
     altered = bytearray(base64.urlsafe_b64decode(parts[2] + "=" * (-len(parts[2]) % 4)))
@@ -112,6 +138,7 @@ def main():
     phase = sys.argv[1] if len(sys.argv) > 1 else "initial"
     for endpoint in ("/health", "/health/db"):
         assert httpx.get(API + endpoint, timeout=10).status_code == 200, endpoint
+    print("PASS: real /health and /health/db return 200.")
     if phase == "initial":
         initial()
     else:

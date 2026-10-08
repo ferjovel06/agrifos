@@ -72,6 +72,10 @@ capture_bindings() {
     --mount "type=bind,source=$(native_path "$AGRIFOS_SUPABASE_WORKDIR"),target=/evidence,readonly" \
     --mount "type=bind,source=$(native_path "$repo_root/docker/audit_bindings.py"),target=/audit.py,readonly" \
     "$test_image" python /audit.py "/evidence/bindings-$phase.jsonl" "$test_id"
+  if [[ "$(uname -s)" == MINGW* || "$(uname -s)" == MSYS* ]]; then
+    powershell.exe -NoProfile -File "$(native_path "$repo_root/docker/audit_windows_listeners.ps1")" \
+      -OutputPath "$(native_path "$AGRIFOS_SUPABASE_WORKDIR/windows-listeners-$phase.json")"
+  fi
 }
 bash scripts/supabase-local.sh start
 for inherited_variable in ${!SUPABASE_@}; do unset "$inherited_variable"; done
@@ -88,12 +92,17 @@ compose -p "$test_id" run --rm --no-deps integration python /checks/integration.
 compose -p "$test_id" exec -T api alembic current
 migration_check_status=0
 compose -p "$test_id" exec -T api alembic check || migration_check_status=$?
+compose -p "$test_id" run --rm --no-deps integration python /checks/schema_check.py
+compose -p "$test_id" exec -T api python -c \
+  'import os; from pathlib import Path; assert os.geteuid() == 10001; status=Path("/proc/self/status").read_text(); assert "NoNewPrivs:\t1" in status; assert "CapBnd:\t0000000000000000" in status; print("PASS: API UID 10001, no-new-privileges and zero capability bound.")'
 compose -p "$test_id" stop api migrate
 bash scripts/supabase-local.sh stop
 bash scripts/supabase-local.sh start
 compose -p "$test_id" run --rm --no-deps migrate
 compose -p "$test_id" up -d --wait --wait-timeout 180 api
 capture_bindings persistence
+compose -p "$test_id" exec -T api alembic check || migration_check_status=$?
+compose -p "$test_id" run --rm --no-deps integration python /checks/schema_check.py
 compose -p "$test_id" run --rm --no-deps integration python /checks/integration.py persistence
 compose -p "$test_id" run --rm --no-deps integration python /checks/integration.py cleanup
 if (( migration_check_status != 0 )); then

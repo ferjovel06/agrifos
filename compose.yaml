@@ -92,9 +92,13 @@ services:
       - path: ${AGRIFOS_ENV_DIR:-.docker/local}/integration.env
         required: false
     command: [python, /checks/integration.py]
+    environment:
+      PYTHONPATH: /workspace/backend
     user: "${AGRIFOS_UID:-1000}:${AGRIFOS_GID:-1000}"
     volumes:
       - ./docker/integration.py:/checks/integration.py:ro
+      - ./docker/schema_check.py:/checks/schema_check.py:ro
+      - ./${AGRIFOS_ENV_DIR:-.docker/local}/supabase/.local/signing-keys.json:/test-signing-keys.json:ro
       - ./${AGRIFOS_ENV_DIR:-.docker/local}/evidence:/evidence
     networks: [supabase]
     init: true
