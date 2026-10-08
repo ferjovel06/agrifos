@@ -2,10 +2,11 @@
 
 Esta infraestructura prepara el backend, Supabase Auth local y herramientas Flutter.
 **La validación todavía es parcial y no hay aprobación para integrar en main.**
-El adaptador local resuelve la publicación loopback en Docker Desktop 4.55.0 y la
-integración real de Auth/MFA/persistencia pasa. El driver completo falla por diferencias
-preexistentes de metadatos Alembic y Trivy falla por vulnerabilidades de Debian.
-Consulta [los resultados actuales](docker-blockers-results.md) y
+El adaptador resuelve la publicación loopback en Docker Desktop 4.55.0. El driver real
+de Auth/MFA/persistencia y Alembic pasa, y la base Trixie conserva Python y el lockfile.
+Trivy sigue en FAIL por ocho CVEs Debian (44 HIGH); Android y CI permanecen pendientes.
+Consulta [el informe vigente](docker-closeout.md),
+[los riesgos pendientes](docker-security-risk-register.md) y
 [la validación inicial](docker-validation.md). Conserva el preflight habilitado.
 
 ## Requisitos y alcance
@@ -38,7 +39,7 @@ y usa otro checkout/proyecto de pruebas; no ejecutes prune ni limpiezas globales
 
 | Componente | Pin |
 |---|---|
-| Backend | Python 3.13.16 slim-bookworm; uv 0.12.2, ambos por digest OCI |
+| Backend | Python 3.13.16 slim-trixie; uv 0.12.2, ambos por digest OCI |
 | Dependencias Python | `backend/pyproject.toml` + `backend/uv.lock`; `uv sync --locked` |
 | Correcciones dirigidas Python | PyJWT 2.14.0 y urllib3 2.8.0; los demás paquetes conservan su versión |
 | Supabase CLI | 2.120.0; archivos autónomos y SHA256 de release fijados |
@@ -167,7 +168,8 @@ bash scripts/docker-dev.sh up
 El healthcheck API comprueba `/health/db`; `/health` solo acredita vida del proceso,
 y `SELECT 1` tampoco acredita por sí solo el esquema: la migración debe terminar primero.
 
-Runtime no root, sin uv/reload ni instalación al arrancar:
+API y migraciones usan UID 10001, sin capacidades y con `no-new-privileges` en Compose.
+El runtime no incluye uv/reload ni instalación al arrancar:
 
 ```bash
 bash scripts/docker-dev.sh stop
@@ -195,6 +197,10 @@ topología y puertos 54331–54334/API 8010. Rechaza destinos remotos y operacio
 proyecto de desarrollo. Prueba health, migración/head, creación administrativa de usuario
 sintético confirmado, trigger antes del primer acceso API, login real, JWT ES256, rechazo
 de contraseña/firma inválidas, MFA TOTP, repetición de migraciones y reinicio preservando datos.
+También rechaza JWT firmados con la clave local pero audience/issuer/exp incorrectos,
+HS256 y tokens malformados; prueba Alembic antes/después del reinicio y la detección
+de drift real de columnas/índices/FKs mediante metadata temporal y transacción de solo lectura.
+En Windows corrobora los cuatro listeners con Get-NetTCPConnection.
 No prueba el recorrido completo de enlaces de confirmación ni hardware.
 
 El usuario sintético se elimina solo tras éxito dentro de ese proyecto nuevo. Ante fallos,
@@ -214,9 +220,11 @@ docker compose -p "$AGRIFOS_NETWORK" run --rm --no-deps migrate
 docker compose -p "$AGRIFOS_NETWORK" run --rm --no-deps migrate alembic check
 ```
 
-Reemplaza `XXXXXXXX` por el id real. `alembic check` puede informar drift de objetos que
-Supabase gestiona; conserva su resultado y distingue esos objetos de diferencias en tablas
-Agrifos. No cambies Auth ni migraciones históricas para forzar un resultado verde.
+Reemplaza `XXXXXXXX` por el id real. `alembic check` debe informar que no hay nuevas
+operaciones. La comparación excluye únicamente el stub externo `auth.users`; conserva
+las FKs públicas, el índice parcial único y ON DELETE RESTRICT de las migraciones existentes.
+Los cambios legítimos de columnas/índices/FKs de aplicación siguen detectándose.
+Investiga cualquier nuevo FAIL sin cambiar Auth ni migraciones históricas para ocultarlo.
 
 Restablecimiento destructivo **solo para un proyecto nuevo de pruebas creado por estos scripts**:
 
@@ -328,12 +336,12 @@ El escáner conserva los informes anteriores en `history/` y verifica el digest 
 del archivo exportado contra el informe actual. Ejecuta los escaneos secuencialmente:
 comparten `.tools/trivy-cache` y Trivy bloquea su caché durante un análisis.
 
-La evaluación autorizada de Trixie se reproduce con `bash scripts/evaluate-trixie.sh`
-seguido de los modos `test`, `scan` e `integration`. Construye tags
-`agrifos-backend-evaluation:trixie-*` y un override ignorado para un proyecto de pruebas
-aislado. Conserva la base Bookworm, los tags normales y los mismos paquetes del lock.
-El modo integration conserva un código de salida no exitoso si `alembic check` detecta
-drift, aunque completa y registra las comprobaciones de persistencia.
+Trixie ya es la base normal adoptada tras la comparación documentada. El helper
+`bash scripts/evaluate-trixie.sh` y sus modos `test`, `scan`, `integration` conservan
+tags aislados `agrifos-backend-evaluation:trixie-*`; ahora reproducen el mismo pin
+Trixie sin modificar tags normales ni paquetes del lock. Rechazan bases no revisadas.
+El driver predeterminado usa la base actual del Dockerfile y devuelve error ante drift;
+el escaneo devuelve FAIL mientras persistan HIGH/CRITICAL.
 
 El workflow Docker agrega validaciones sin sustituir los checks nativos existentes:
 backend con lock, pruebas/escaneo de imagen, integración Auth aislada y Flutter analyze/test.

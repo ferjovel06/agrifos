@@ -1,9 +1,10 @@
 # Informe técnico y validación de Docker
 
-**Actualización posterior:** N1 y S1 se implementaron y S2 se evaluó de forma aislada.
-La publicación loopback y Auth/MFA/persistencia reales pasan; siguen fallando Trivy
-por Debian y `alembic check` por metadatos preexistentes. Android y el host Linux completo
-siguen pendientes. [Informe vigente y evidencia](docker-blockers-results.md).
+**Registro histórico de la fase inicial.** La fase posterior corrigió Alembic y adoptó
+Trixie con Python/lock conservados; la integración real pasa en Windows. Trivy sigue
+en FAIL y Android/CI requieren intervención. Consulta el
+[informe vigente y evidencia](docker-closeout.md) y el
+[registro de riesgos](docker-security-risk-register.md).
 El resto de este documento conserva el registro de la fase inicial; sus estados
 describen aquella ejecución y no sustituyen los resultados posteriores.
 Los informes Trivy originales se preservaron en

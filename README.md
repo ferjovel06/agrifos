@@ -268,12 +268,28 @@ agrifos/
 
 ### Entorno local con Docker
 
-La guía de incorporación y los comandos para backend, Supabase local y Flutter/Android
-están en [docs/docker.md](docs/docker.md). Docker requiere un daemon Linux operativo;
-Supabase CLI se instala localmente con una versión fijada. Consulta el
-[registro de validación](docs/docker-validation.md) antes de considerar el entorno verificado.
-El estado actual es parcial: Supabase está bloqueado por el binding de puertos en el
-Docker Desktop probado; APK y pruebas de integración siguen pendientes.
+La guía y los comandos para backend, Supabase local y Flutter/Android están en
+[docs/docker.md](docs/docker.md). Requiere Docker Linux operativo y Git Bash en Windows;
+las herramientas se preparan por proyecto, sin SDK nativo. La base backend es Python
+3.13.16 sobre Debian Trixie, con dependencias fijadas por lockfile.
+La integración real, los bindings loopback, Alembic, JWT ES256 y MFA pasan en Windows.
+Consulta el [informe vigente](docs/docker-closeout.md) y el
+[registro de riesgos](docs/docker-security-risk-register.md): Trivy sigue en FAIL,
+y Android/CI requieren intervención pendiente. La dockerización no está aprobada para main.
+
+```bash
+bash scripts/docker-dev.sh prepare
+bash scripts/install-supabase.sh
+bash scripts/docker-dev.sh build
+bash scripts/supabase-local.sh start
+bash scripts/docker-dev.sh configure
+bash scripts/docker-dev.sh up
+bash scripts/docker-dev.sh health
+```
+
+Para detener conservando datos: `bash scripts/docker-dev.sh stop` y
+`bash scripts/supabase-local.sh stop`. Las licencias Android se revisan personalmente
+con `bash scripts/flutter-container.sh licenses`; no hay aceptación automática.
 
 ### Backend
 

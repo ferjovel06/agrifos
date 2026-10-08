@@ -1,5 +1,10 @@
 # Resolución de bloqueantes Docker: resultados
 
+**Registro histórico de N1/S1/evaluación S2.** La fase de finalización posterior
+resolvió Alembic y adoptó Trixie, conservando estas evidencias. El resultado vigente
+está en [docker-closeout.md](docker-closeout.md); Trivy sigue bloqueado y no hay
+aprobación de merge. Los estados de este documento corresponden a su propia fase.
+
 Fecha: 2026-10-08. Rama exclusiva: `chore/docker-environment`.
 Base preservada: `a1df7e06943aef78c042340b65edb7e7e4113701`.
 

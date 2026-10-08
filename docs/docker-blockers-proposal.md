@@ -2,7 +2,8 @@
 
 Registro de la propuesta inicial. Posteriormente se autorizaron N1, S1 y la evaluación
 aislada de S2. Consulta [el informe de implementación](docker-blockers-results.md)
-para los resultados actuales; las solicitudes de aprobación de este documento son históricas.
+para aquella fase y [el cierre vigente](docker-closeout.md) para los resultados actuales;
+las solicitudes de aprobación de este documento son históricas.
 
 Fecha: 2026-10-08. Rama: `chore/docker-environment`.
 Código analizado: `857b897dbb7e7ad771a6c2831090c8a5a7ecbeb2`.
