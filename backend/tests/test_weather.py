@@ -1,3 +1,4 @@
+import asyncio
 import unittest
 import uuid
 from types import SimpleNamespace
@@ -397,6 +398,99 @@ class FallbackWeatherProviderTests(unittest.IsolatedAsyncioTestCase):
 
 
 class WeatherServiceTests(unittest.IsolatedAsyncioTestCase):
+    async def test_concurrent_services_share_one_provider_request(self):
+        started = asyncio.Event()
+        release = asyncio.Event()
+
+        async def fetch(**kwargs):
+            started.set()
+            await release.wait()
+            return provider_payload()
+
+        provider = SimpleNamespace(fetch_forecast=AsyncMock(side_effect=fetch))
+        cache = WeatherForecastCache()
+        services = [WeatherService(provider=provider, cache=cache) for _ in range(10)]
+        requests = [asyncio.create_task(service.forecast(self.farm, 2)) for service in services]
+        await started.wait()
+        release.set()
+        forecasts = await asyncio.gather(*requests)
+        self.assertTrue(all(forecast is forecasts[0] for forecast in forecasts))
+        provider.fetch_forecast.assert_awaited_once()
+
+    async def test_refresh_reuses_unchanged_data_and_replaces_changed_data(self):
+        now = 0.0
+        provider = SimpleNamespace(fetch_forecast=AsyncMock(return_value=provider_payload()))
+        service = WeatherService(
+            provider=provider,
+            cache=WeatherForecastCache(fresh_seconds=10, stale_seconds=60, clock=lambda: now),
+        )
+        first = await service.forecast(self.farm, 2)
+        now = 10.0
+        self.assertIs(await service.forecast(self.farm, 2), first)
+        now = 19.0
+        self.assertIs(await service.forecast(self.farm, 2), first)
+        self.assertEqual(provider.fetch_forecast.await_count, 2)
+        changed = provider_payload()
+        changed["current"]["temperature_2m"] = 29
+        provider.fetch_forecast.return_value = changed
+        now = 20.0
+        updated = await service.forecast(self.farm, 2)
+        self.assertEqual(updated.current.temperature_c, 29)
+        self.assertIsNot(updated, first)
+        self.assertEqual(provider.fetch_forecast.await_count, 3)
+
+    async def test_failure_cooldown_prevents_repeated_requests_and_allows_recovery(self):
+        now = 0.0
+        provider = SimpleNamespace(fetch_forecast=AsyncMock(return_value=provider_payload()))
+        service = WeatherService(
+            provider=provider,
+            cache=WeatherForecastCache(
+                fresh_seconds=10, stale_seconds=60, retry_seconds=5, clock=lambda: now,
+            ),
+        )
+        first = await service.forecast(self.farm, 2)
+        provider.fetch_forecast.side_effect = WeatherProviderUnavailable("offline")
+        now = 10.0
+        self.assertIs(await service.forecast(self.farm, 2), first)
+        now = 14.0
+        self.assertIs(await service.forecast(self.farm, 2), first)
+        self.assertEqual(provider.fetch_forecast.await_count, 2)
+        provider.fetch_forecast.side_effect = None
+        now = 15.0
+        self.assertIs(await service.forecast(self.farm, 2), first)
+        self.assertEqual(provider.fetch_forecast.await_count, 3)
+
+    async def test_failure_without_cached_data_is_also_throttled(self):
+        provider = SimpleNamespace(
+            fetch_forecast=AsyncMock(side_effect=WeatherProviderTimeout("timeout"))
+        )
+        service = WeatherService(provider=provider, cache=WeatherForecastCache())
+        for _ in range(3):
+            with self.assertRaises(WeatherProviderTimeout):
+                await service.forecast(self.farm, 2)
+        provider.fetch_forecast.assert_awaited_once()
+
+    async def test_cancelled_request_does_not_cancel_shared_refresh(self):
+        started = asyncio.Event()
+        release = asyncio.Event()
+
+        async def fetch(**kwargs):
+            started.set()
+            await release.wait()
+            return provider_payload()
+
+        provider = SimpleNamespace(fetch_forecast=AsyncMock(side_effect=fetch))
+        service = WeatherService(provider=provider, cache=WeatherForecastCache())
+        request = asyncio.create_task(service.forecast(self.farm, 2))
+        await started.wait()
+        request.cancel()
+        with self.assertRaises(asyncio.CancelledError):
+            await request
+        release.set()
+        forecast = await service.forecast(self.farm, 2)
+        self.assertEqual(forecast.current.temperature_c, 27.4)
+        provider.fetch_forecast.assert_awaited_once()
+
     async def test_invalid_data_uses_stale_cache_only_until_its_deadline(self):
         now = 0.0
         provider = SimpleNamespace(fetch_forecast=AsyncMock(return_value=provider_payload()))

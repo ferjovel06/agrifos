@@ -6,7 +6,14 @@ from app.integrations.weather_normalization import MetNorwayNormalizer, OpenMete
 from app.integrations.weather_provider import (
     FallbackWeatherProvider, MetNorwayProvider, OpenMeteoProvider,
 )
-from app.services.weather_service import WeatherService
+from app.services.weather_service import WeatherForecastCache, WeatherService
+
+
+_forecast_cache = WeatherForecastCache(
+    fresh_seconds=settings.WEATHER_CACHE_FRESH_SECONDS,
+    stale_seconds=settings.WEATHER_CACHE_STALE_SECONDS,
+    retry_seconds=settings.WEATHER_CACHE_RETRY_SECONDS,
+)
 
 
 def get_weather_service() -> WeatherService:
@@ -27,4 +34,7 @@ def get_weather_service() -> WeatherService:
         base_url=settings.WEATHER_FALLBACK_API_BASE_URL,
         user_agent=settings.WEATHER_FALLBACK_USER_AGENT,
     )
-    return WeatherService(provider=FallbackWeatherProvider(primary=primary, fallback=fallback))
+    return WeatherService(
+        provider=FallbackWeatherProvider(primary=primary, fallback=fallback),
+        cache=_forecast_cache,
+    )
