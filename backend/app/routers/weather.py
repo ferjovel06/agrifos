@@ -6,7 +6,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.auth import get_current_user, has_global_read_access
 from app.db.session import get_db
-from app.integrations.weather_provider import (
+from app.dependencies.weather import get_weather_service
+from app.integrations.weather_contracts import (
     WeatherProviderRateLimited,
     WeatherProviderTimeout,
     WeatherProviderUnavailable,
@@ -21,8 +22,6 @@ router = APIRouter(prefix="/weather", tags=["weather"])
 logger = logging.getLogger(__name__)
 
 
-def get_weather_service() -> WeatherService:
-    return WeatherService()
 
 
 async def _get_owned_farm(
