@@ -1,17 +1,19 @@
 # Desarrollo local con Docker
 
 Esta infraestructura prepara el backend, Supabase Auth local y herramientas Flutter.
-**La validación todavía es parcial.** Consulta los resultados reales, bloqueos y tareas
-pendientes en [docker-validation.md](docker-validation.md) antes de usar el entorno.
-En Docker Desktop 4.55.0 del equipo probado, Supabase está bloqueado porque el daemon
-no respeta el binding loopback de la red y la CLI 2.120.0 publica puertos sin IP explícita.
-El preflight rechaza ese caso antes de lanzar servicios; no continúes desactivando el control.
+**La validación todavía es parcial y no hay aprobación para integrar en main.**
+El adaptador local resuelve la publicación loopback en Docker Desktop 4.55.0 y la
+integración real de Auth/MFA/persistencia pasa. El driver completo falla por diferencias
+preexistentes de metadatos Alembic y Trivy falla por vulnerabilidades de Debian.
+Consulta [los resultados actuales](docker-blockers-results.md) y
+[la validación inicial](docker-validation.md). Conserva el preflight habilitado.
 
 ## Requisitos y alcance
 
 - Hosts objetivo: Windows x64 con Git Bash y Docker Desktop usando contenedores Linux/WSL2,
-  y Linux x86_64 con Docker Engine. Backend y Flutter tools se comprobaron en Windows;
-  Supabase está bloqueado allí. Linux es objetivo del CI Ubuntu 24.04 amd64, todavía no
+  y Linux x86_64 con Docker Engine. Backend, Supabase y Flutter tools se comprobaron en Windows.
+  El adaptador tiene pruebas ejecutadas en Windows y Linux; el flujo completo en un host
+  Linux es objetivo del CI Ubuntu 24.04 amd64, todavía no
   ejecutado. ARM, macOS e iOS no están validados.
 - Git, Bash y Docker Compose v2. El equipo de desarrollo tiene cliente Docker 29.1.3,
   Compose 2.40.3 y WSL 2.6.3. La CLI Supabase autónoma se descarga en `.tools/`;
@@ -38,7 +40,9 @@ y usa otro checkout/proyecto de pruebas; no ejecutes prune ni limpiezas globales
 |---|---|
 | Backend | Python 3.13.16 slim-bookworm; uv 0.12.2, ambos por digest OCI |
 | Dependencias Python | `backend/pyproject.toml` + `backend/uv.lock`; `uv sync --locked` |
+| Correcciones dirigidas Python | PyJWT 2.14.0 y urllib3 2.8.0; los demás paquetes conservan su versión |
 | Supabase CLI | 2.120.0; archivos autónomos y SHA256 de release fijados |
+| Adaptador loopback | Go 1.27.2 por digest, compilado en Docker; ejecutables locales Windows/Linux, sin instalar Go en el host |
 | PostgreSQL local | Versión mayor 17; imágenes de servicios elegidas por la CLI fijada |
 | Flutter / Dart | 3.44.9 stable / 3.12.2; archivo oficial con SHA256 |
 | Java | Temurin 17.0.20.1+1, base Ubuntu Noble por digest |
@@ -50,7 +54,8 @@ versiones derivadas del Flutter elegido. Pub usa `pubspec.lock` y restauración
 `--enforce-lockfile`; cada tarea comprueba que sus manifiestos/configuración no cambiaron.
 APT instala un conjunto pequeño de paquetes de Ubuntu; esos paquetes no están fijados
 individualmente. Las imágenes de servicios Supabase usan los tags de la CLI; registrar sus
-digests efectivos forma parte de la validación pendiente, no se presume inmutabilidad.
+digests efectivos de los cuatro servicios usados quedaron registrados en la evidencia
+de esta fase; los tags vendor siguen siendo externos y no se presume inmutabilidad futura.
 
 ## Incorporación breve
 
@@ -94,6 +99,15 @@ La CLI inicia PostgreSQL, GoTrue/Auth, gateway y correo local; Studio es opciona
 Compose inicia `migrate` y después `api`, y ofrece tareas unitarias/Flutter independientes.
 Ambos comparten **una red necesaria**, `agrifos-local`, con publicación loopback.
 Los scripts verifican propiedad y bindings; rechazan recursos incompatibles preexistentes.
+`supabase-local.sh` construye/verifica automáticamente un adaptador nativo en `.tools/`.
+Solo el proceso hijo de Supabase CLI recibe su directorio al inicio de PATH. El adaptador
+delegará al Docker nativo capturado por ruta absoluta y convierte cada publicación del
+CLI en `127.0.0.1:puerto_host:puerto_contenedor`. Rechaza IPs distintas, publish-all,
+host networking, flags de creación desconocidos y creaciones/arranques de otro proyecto/workdir.
+Comprueba los bindings solicitados antes de `start` y los efectivos después; si el daemon
+devuelve una publicación insegura, intenta detener únicamente ese contenedor propio.
+Las tareas temporales de inicialización del CLI se admiten solo en la red/proyecto propios,
+sin puertos ni binds cuando falta su etiqueta workdir, que el adaptador añade.
 El preflight requiere el runtime backend construido y comprueba la publicación con un
 contenedor temporal sin listener ni credenciales. Elimina únicamente esa sonda identificada;
 si el daemon publica fuera de loopback, no inicia Supabase. Las tareas Flutter reutilizan
@@ -119,6 +133,10 @@ conserva esa URL pública base para derivarlo. Solo se añadió `SUPABASE_JWKS_U
 para obtener las claves por DNS interno. Un `SUPABASE_JWT_ISSUER` separado no fue necesario.
 Se conservan ES256, audiencia `authenticated`, firma, expiración e issuer. Los defaults
 del despliegue existente siguen derivándose de `SUPABASE_URL`; `render.yaml` no cambió.
+PyJWT 2.14.0 rechaza redirecciones JWKS: una respuesta 301/302/303/307/308 produce el
+503 existente y no se consulta el destino. Las regresiones HTTP comprueban este caso.
+Su cooldown predeterminado de 30 segundos puede retrasar una clave con kid nuevo tras
+una descarga reciente; la rotación posterior está probada y no se desactiva esa protección.
 
 Cada proyecto genera su clave ES256 en `supabase/.local/signing-keys.json`, ignorada y
 sin sobrescribirla. Supabase crea `auth.users` y `auth.mfa_factors`; Alembic reutiliza sus
@@ -303,9 +321,19 @@ configuración y la imagen backend runtime real: vulnerabilidades, secretos y co
 Los hallazgos HIGH/CRITICAL producen `FAIL`, sin exclusiones. Los informes JSON y el ID
 de imagen quedan en `.docker/evidence/scanners/`; el escáner no recibe archivos env ni
 acceso al socket Docker. El resultado y las limitaciones constan en el registro de validación.
-En la ejecución registrada, Trivy devolvió controles para los dos Dockerfiles; no emitió
+En la ejecución actual, Trivy aprobó 60 controles para los tres Dockerfiles; no emitió
 controles específicos de Compose aunque el archivo se suministró. Compose se valida
 con `config --quiet` y revisión de los bindings, perfiles, montajes y variables.
+El escáner conserva los informes anteriores en `history/` y verifica el digest de configuración
+del archivo exportado contra el informe actual. Ejecuta los escaneos secuencialmente:
+comparten `.tools/trivy-cache` y Trivy bloquea su caché durante un análisis.
+
+La evaluación autorizada de Trixie se reproduce con `bash scripts/evaluate-trixie.sh`
+seguido de los modos `test`, `scan` e `integration`. Construye tags
+`agrifos-backend-evaluation:trixie-*` y un override ignorado para un proyecto de pruebas
+aislado. Conserva la base Bookworm, los tags normales y los mismos paquetes del lock.
+El modo integration conserva un código de salida no exitoso si `alembic check` detecta
+drift, aunque completa y registra las comprobaciones de persistencia.
 
 El workflow Docker agrega validaciones sin sustituir los checks nativos existentes:
 backend con lock, pruebas/escaneo de imagen, integración Auth aislada y Flutter analyze/test.

@@ -1,5 +1,14 @@
 # Informe técnico y validación de Docker
 
+**Actualización posterior:** N1 y S1 se implementaron y S2 se evaluó de forma aislada.
+La publicación loopback y Auth/MFA/persistencia reales pasan; siguen fallando Trivy
+por Debian y `alembic check` por metadatos preexistentes. Android y el host Linux completo
+siguen pendientes. [Informe vigente y evidencia](docker-blockers-results.md).
+El resto de este documento conserva el registro de la fase inicial; sus estados
+describen aquella ejecución y no sustituyen los resultados posteriores.
+Los informes Trivy originales se preservaron en
+`.docker/evidence/phase2/baseline-scanners/`; `scanners/` contiene el análisis vigente.
+
 Fecha: 2026-10-08. Base: `a1df7e06943aef78c042340b65edb7e7e4113701`.
 Rama: `chore/docker-environment`, creada desde `origin/main` actualizado.
 **Estado: INCOMPLETO. Backend y Flutter tools tienen pruebas reales aprobadas;
