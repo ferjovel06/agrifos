@@ -112,6 +112,20 @@ unset OPENAI_API_KEY S3_HOST S3_REGION S3_ACCESS_KEY S3_SECRET_KEY
 [[ "$(timeout 30 "$cli" --version)" == "$version" ]] || fail "The local CLI must be exactly ${version}."
 timeout 20 docker info --format '{{.ServerVersion}}' >/dev/null || fail 'Docker daemon is unavailable; start your configured container runtime.'
 
+# Capture the real executable before adding the adapter only to the CLI child's
+# PATH. Ordinary host Docker commands continue to use their original executable.
+real_docker="$(command -v docker)"
+[[ "$real_docker" == /* ]] || fail 'Docker must resolve to an absolute executable path.'
+bash "$repo_root/scripts/install-loopback-adapter.sh"
+adapter_revision="$(cd "$repo_root/docker/loopback-adapter" && sha256sum Dockerfile go.mod ./*.go | sha256sum | cut -d ' ' -f1)"
+adapter_dir="$repo_root/.tools/loopback-adapter/$adapter_revision"
+if "$windows"; then adapter_binary="$adapter_dir/docker.exe"; else adapter_binary="$adapter_dir/docker"; fi
+adapter_environment=(env "AGRIFOS_REAL_DOCKER=$(native_path "$real_docker")"
+    "AGRIFOS_ADAPTER_PROJECT=$project_id" "AGRIFOS_ADAPTER_NETWORK=$network"
+    "AGRIFOS_ADAPTER_WORKDIR=$(native_path "$workdir")")
+adapter_command=("${adapter_environment[@]}" "$adapter_binary")
+cli_environment=("${adapter_environment[@]}" "PATH=$adapter_dir:$PATH")
+
 sanitize_cli_output() {
     # Credential summaries emitted by the CLI must never enter terminal output or saved logs.
     sed -E \
@@ -211,12 +225,12 @@ preflight_loopback_binding() (
     }
     trap cleanup_probe EXIT
     probe_ref="$probe_name"
-    timeout 20 docker create --name "$probe_name" --restart no \
+    timeout 20 "${adapter_command[@]}" create --name "$probe_name" --restart no \
         --label com.agrifos.managed-by=supabase-local.sh --label "com.agrifos.project=$project_id" \
         --label "com.agrifos.probe-token=$probe_token" --network "$network" \
         --publish '0:8080' --entrypoint python "$probe_image" \
         -c 'import time; time.sleep(45)' >/dev/null || fail 'Docker preflight probe creation failed.'
-    timeout 20 docker start "$probe_ref" >/dev/null || fail 'Docker preflight probe startup failed.'
+    timeout 20 "${adapter_command[@]}" start "$probe_ref" >/dev/null || fail 'Docker preflight probe startup failed.'
     running="$(timeout 20 docker inspect --format '{{.State.Running}}' "$probe_ref")" || fail 'Docker preflight probe inspection failed.'
     [[ "$running" == true ]] || fail 'The bounded preflight probe exited before verification.'
     bindings="$(timeout 20 docker inspect --format '{{range .NetworkSettings.Ports}}{{range .}}{{printf "%s:%s\n" .HostIp .HostPort}}{{end}}{{end}}' "$probe_ref")" || fail 'Docker preflight port inspection failed.'
@@ -224,7 +238,7 @@ preflight_loopback_binding() (
     while IFS= read -r binding; do
         [[ "$binding" == 127.0.0.1:* ]] || fail "Docker publishes $binding outside loopback despite the bridge setting; refusing to launch Auth/DB/mail. No runtime configuration was changed."
     done <<< "$bindings"
-    printf 'PASS: actual Docker published ports honor the owned bridge loopback default.\n'
+    printf 'PASS: adapter and actual Docker published ports use explicit IPv4 loopback.\n'
 )
 cleanup_failed_start() {
     local result=$?
@@ -232,7 +246,7 @@ cleanup_failed_start() {
     if [[ "$result" -ne 0 ]]; then
         if (assert_owned_resources) && (assert_network); then
             printf 'Startup verification failed; stopping only this owned project and preserving its volumes.\n' >&2
-            if ! timeout --foreground 120 "$cli" --workdir "$(native_path "$workdir")" stop \
+            if ! timeout --foreground 120 "${cli_environment[@]}" "$cli" --workdir "$(native_path "$workdir")" stop \
                 --project-id "$project_id" 2>&1 | sanitize_cli_output; then
                 printf 'Owned project stop failed; inspect its resource state before retrying.\n' >&2
             fi
@@ -273,7 +287,7 @@ case "$command_name" in
             # gen signing-key reads the TOML path, not its environment override. Only
             # append to this newly created placeholder; never overwrite an existing key.
             (set -o noclobber; printf '[]\n' > "$key_file") || fail 'A signing key appeared concurrently; it was not overwritten.'
-            if ! timeout 30 "$cli" --workdir "$(native_path "$workdir")" gen signing-key --algorithm ES256 --append \
+            if ! timeout 30 "${cli_environment[@]}" "$cli" --workdir "$(native_path "$workdir")" gen signing-key --algorithm ES256 --append \
                 2>&1 | sanitize_cli_output > "$state_dir/key-generation.log"; then
                 rm -f -- "$key_file"
                 tail -n 15 -- "$state_dir/key-generation.log" >&2
@@ -287,7 +301,7 @@ case "$command_name" in
         [[ "$start_timeout" =~ ^[0-9]+$ && "$start_timeout" -ge 30 && "$start_timeout" -le 1800 ]] || fail 'Startup timeout must be between 30 and 1800 seconds.'
         printf 'Starting local Supabase; first use downloads pinned service images.\n'
         trap cleanup_failed_start EXIT
-        if ! timeout --foreground "$start_timeout" "$cli" --workdir "$(native_path "$workdir")" start \
+        if ! timeout --foreground "$start_timeout" "${cli_environment[@]}" "$cli" --workdir "$(native_path "$workdir")" start \
             --network-id "$network" --exclude "$excluded" 2>&1 | sanitize_cli_output > "$state_dir/start.log"; then
             tail -n 40 -- "$state_dir/start.log" >&2
             fail 'Supabase start failed; sanitized details are above. Local data were preserved.'
@@ -310,7 +324,7 @@ case "$command_name" in
     stop)
         [[ -f "$owner_file" ]] || fail 'No task ownership record exists; refusing to stop resources.'
         assert_network || fail 'The owned network is missing; refusing to stop resources.'
-        timeout --foreground 120 "$cli" --workdir "$(native_path "$workdir")" stop --project-id "$project_id" \
+        timeout --foreground 120 "${cli_environment[@]}" "$cli" --workdir "$(native_path "$workdir")" stop --project-id "$project_id" \
             2>&1 | sanitize_cli_output
         printf 'Stopped owned local Supabase; database volumes and signing keys were preserved.\n'
         ;;
@@ -318,7 +332,7 @@ case "$command_name" in
         [[ -f "$owner_file" ]] || fail 'No task ownership record exists; refusing destructive reset.'
         assert_network || fail 'The owned integration network is missing; refusing destructive reset.'
         printf 'Warning: permanently deleting Supabase data volumes for newly created integration project %s.\n' "$project_id" >&2
-        timeout --foreground 120 "$cli" --workdir "$(native_path "$workdir")" stop \
+        timeout --foreground 120 "${cli_environment[@]}" "$cli" --workdir "$(native_path "$workdir")" stop \
             --project-id "$project_id" --no-backup 2>&1 | sanitize_cli_output
         printf 'Deleted integration Supabase data for %s; signing keys and shared network were retained.\n' "$project_id"
         ;;

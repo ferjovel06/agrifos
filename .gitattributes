@@ -1,1 +1,2 @@
 *.sh text eol=lf
+docker/loopback-adapter/* text eol=lf

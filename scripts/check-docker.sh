@@ -97,7 +97,7 @@ check_lint() {
   # Prevent personal environment overrides from disabling the committed policy.
   local variable dockerfile
   for variable in ${!HADOLINT_@}; do unset "$variable"; done
-  for dockerfile in backend/Dockerfile docker/flutter/Dockerfile; do
+  for dockerfile in backend/Dockerfile docker/flutter/Dockerfile docker/loopback-adapter/Dockerfile; do
     "$hadolint_binary" --config "$(native_path "$repo_root/.hadolint.yaml")" \
       --failure-threshold error --disable-ignore-pragma --no-color \
       "$(native_path "$repo_root/$dockerfile")"
@@ -136,6 +136,7 @@ check_images() {
   docker run "${scanner_options[@]}" \
     --mount "type=bind,source=$(native_path "$repo_root/backend/Dockerfile"),target=/input/backend/Dockerfile,readonly" \
     --mount "type=bind,source=$(native_path "$repo_root/docker/flutter/Dockerfile"),target=/input/flutter/Dockerfile,readonly" \
+    --mount "type=bind,source=$(native_path "$repo_root/docker/loopback-adapter/Dockerfile"),target=/input/adapter/Dockerfile,readonly" \
     --mount "type=bind,source=$(native_path "$repo_root/compose.yaml"),target=/input/compose.yaml,readonly" \
     "$trivy_image" config --cache-dir /cache --timeout 10m --severity HIGH,CRITICAL \
       --exit-code 1 --format json --output /output/trivy-config.json /input || config_status=$?

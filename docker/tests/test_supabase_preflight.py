@@ -147,6 +147,9 @@ class SupabaseLoopbackPreflightTests(unittest.TestCase):
                 "set -Eeuo pipefail\n"
                 "fail() { printf 'Error: %s\\n' \"$*\" >&2; exit 1; }\n"
                 f"project_id={PROJECT}\nnetwork={PROJECT}\n"
+                # Go adapter checks are separate; this suite injects daemon
+                # outcomes to verify the existing Bash fail-closed guardrail.
+                "adapter_command=(docker)\n"
                 + self.preflight
                 + "\npreflight_loopback_binding\nsupabase start\n"
             )
