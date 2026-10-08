@@ -10,6 +10,7 @@ class Settings(BaseSettings):
     DB_POOL_RECYCLE_SECONDS: int = 300
 
     SUPABASE_URL: str
+    SUPABASE_JWKS_URL: str | None = None
     WEATHER_API_BASE_URL: str = "https://api.open-meteo.com/v1"
     WEATHER_FALLBACK_API_BASE_URL: str = (
         "https://api.met.no/weatherapi/locationforecast/2.0"
@@ -18,6 +19,13 @@ class Settings(BaseSettings):
         "Agrifos/0.1 https://github.com/ferjovel06/agrifos"
     )
     ALLOWED_ORIGINS: str = ""
+
+    @property
+    def supabase_jwks_url(self) -> str:
+        return (
+            self.SUPABASE_JWKS_URL
+            or f"{self.SUPABASE_URL.rstrip('/')}/auth/v1/.well-known/jwks.json"
+        )
 
     @property
     def cors_origins(self) -> list[str]:

@@ -21,7 +21,7 @@ WRITE_ROLES = frozenset({"admin", "farmer"})
 logger = logging.getLogger(__name__)
 
 _jwks_client = jwt.PyJWKClient(
-    f"{settings.SUPABASE_URL}/auth/v1/.well-known/jwks.json",
+    settings.supabase_jwks_url,
     cache_keys=True,
     lifespan=3600,
     timeout=5,
@@ -43,7 +43,7 @@ async def get_verified_claims(
             algorithms=["ES256"],
             audience="authenticated",
             issuer=f"{settings.SUPABASE_URL.strip('/')}/auth/v1",
-    )
+        )
     except jwt.PyJWKClientConnectionError:
         logger.warning("Supabase signing keys are temporarily unavailable.")
         raise HTTPException(
