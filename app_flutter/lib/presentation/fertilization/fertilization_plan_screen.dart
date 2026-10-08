@@ -166,7 +166,9 @@ class _FertilizationPlanScreenState extends State<FertilizationPlanScreen>
       children: [
         _SectionTitle(
           title: 'Necesidades del cultivo',
-          subtitle: 'Kilogramos por hectárea',
+          subtitle: scenario.organic == null
+              ? 'Kilogramos por hectárea'
+              : 'Objetivos del motor mineral para comparar',
         ),
         const SizedBox(height: 10),
         if (recommendation.nutrientRequirements.isEmpty)
@@ -184,19 +186,24 @@ class _FertilizationPlanScreenState extends State<FertilizationPlanScreen>
             ),
             itemBuilder: (_, index) => _NutrientCard(
               requirement: recommendation.nutrientRequirements[index],
+              isOrganicReference: scenario.organic != null,
             ),
           ),
         const SizedBox(height: 22),
         _SectionTitle(
           title: scenario.name,
-          subtitle: scenario.isMathematicallyValid
+          subtitle: scenario.organic != null
+              ? 'Fuentes y dosis totales · evaluación de referencia'
+              : scenario.isMathematicallyValid
               ? (recommendation.usesYoungCropSchedule
                     ? 'Totales acumulados del plan hasta el mes 18'
                     : 'Fuentes y dosis totales')
               : 'Requiere revisión técnica',
         ),
         const SizedBox(height: 10),
-        if (scenario.products.isEmpty)
+        if (scenario.organic != null)
+          _buildOrganicSummary(scenario.organic!)
+        else if (scenario.products.isEmpty)
           const _EmptyState(message: 'Este escenario no requiere productos.')
         else
           for (final product in scenario.products)
@@ -204,7 +211,7 @@ class _FertilizationPlanScreenState extends State<FertilizationPlanScreen>
               padding: const EdgeInsets.only(bottom: 10),
               child: _ProductCard(product: product),
             ),
-        if (recommendation.warnings.isNotEmpty) ...[
+        if (recommendation.warnings.isNotEmpty && scenario.organic == null) ...[
           const SizedBox(height: 12),
           _NoticeCard(
             title: 'Antes de aplicar',
@@ -227,6 +234,18 @@ class _FertilizationPlanScreenState extends State<FertilizationPlanScreen>
   }
 
   Widget _buildScheduleTab() {
+    if (scenario.organic != null && !scenario.organic!.canApply) {
+      return ListView(
+        padding: const EdgeInsets.all(16),
+        children: const [
+          _EmptyState(
+            message:
+                'Evaluación orgánica pendiente de validación. '
+                'No hay dosis ni aplicaciones aprobadas para ejecutar.',
+          ),
+        ],
+      );
+    }
     final applications = scenario.applicationSchedule;
     return ListView(
       padding: const EdgeInsets.all(16),
@@ -246,6 +265,47 @@ class _FertilizationPlanScreenState extends State<FertilizationPlanScreen>
               application: applications[index],
               isLast: index == applications.length - 1,
             ),
+      ],
+    );
+  }
+
+  Widget _buildOrganicSummary(OrganicScenario organic) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        for (final dose in organic.candidates)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 10),
+            child: _ProductCard.organic(organic: dose),
+          ),
+        _NoticeCard(
+          title: organic.state == 'partial'
+              ? 'Evaluación orgánica parcial'
+              : 'Evaluación de referencia',
+          items: organic.notices,
+          color: _green,
+          background: _softGreen,
+          icon: Icons.info_outline,
+        ),
+        const SizedBox(height: 12),
+        const SizedBox(height: 12),
+        const Text(
+          'Balance de nutrientes totales de referencia',
+          style: TextStyle(color: _brown, fontWeight: FontWeight.w700),
+        ),
+        for (final entry in organic.totalContributions.entries)
+          Padding(
+            padding: const EdgeInsets.only(top: 6),
+            child: Text(
+              '${entry.key}: ${_number(entry.value)} kg/ha aportados · '
+              '${_number(organic.shortfall[entry.key] ?? 0)} kg/ha pendientes',
+            ),
+          ),
+        const SizedBox(height: 8),
+        const Text(
+          'Disponibilidad para el cultivo: no determinada. '
+          'El faltante de referencia no es una prescripción adicional.',
+        ),
       ],
     );
   }
@@ -365,9 +425,13 @@ class _SectionTitle extends StatelessWidget {
 }
 
 class _NutrientCard extends StatelessWidget {
-  const _NutrientCard({required this.requirement});
+  const _NutrientCard({
+    required this.requirement,
+    this.isOrganicReference = false,
+  });
 
   final NutrientRequirement requirement;
+  final bool isOrganicReference;
 
   @override
   Widget build(BuildContext context) {
@@ -391,8 +455,13 @@ class _NutrientCard extends StatelessWidget {
                   fontWeight: FontWeight.w800,
                 ),
               ),
-              const Spacer(),
-              _StatusBadge(status: requirement.soilStatus),
+              const SizedBox(width: 4),
+              Expanded(
+                child: Align(
+                  alignment: Alignment.centerRight,
+                  child: _StatusBadge(status: requirement.soilStatus),
+                ),
+              ),
             ],
           ),
           const Spacer(),
@@ -404,9 +473,13 @@ class _NutrientCard extends StatelessWidget {
               fontWeight: FontWeight.w800,
             ),
           ),
-          const Text(
-            'kg/ha a fertilizar',
-            style: TextStyle(
+          Text(
+            isOrganicReference
+                ? 'kg/ha · referencia mineral'
+                : 'kg/ha a fertilizar',
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
               color: _FertilizationPlanScreenState._muted,
               fontSize: 11,
             ),
@@ -459,12 +532,21 @@ class _StatusBadge extends StatelessWidget {
 }
 
 class _ProductCard extends StatelessWidget {
-  const _ProductCard({required this.product});
+  const _ProductCard({required this.product}) : organic = null;
+  const _ProductCard.organic({required this.organic}) : product = null;
 
-  final FertilizerProductDose product;
+  final FertilizerProductDose? product;
+  final OrganicCandidateDose? organic;
 
   @override
   Widget build(BuildContext context) {
+    final dose = organic;
+    final name = product?.displayName ?? dose!.product;
+    final amount = product?.kgPerHectare ?? dose!.quantityHa;
+    final unit = dose?.unit ?? 'kg';
+    final manzana = product?.kgPerManzana ?? dose!.quantityManzana;
+    final perPlant = product?.gramsPerPlant ?? dose!.quantityPlant;
+    final plantUnit = dose?.plantUnit ?? 'g';
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
@@ -492,7 +574,7 @@ class _ProductCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  product.displayName,
+                  name,
                   style: const TextStyle(
                     color: _FertilizationPlanScreenState._brown,
                     fontWeight: FontWeight.w700,
@@ -500,24 +582,35 @@ class _ProductCard extends StatelessWidget {
                 ),
                 const SizedBox(height: 3),
                 Text(
-                  '${_number(product.kgPerManzana)} kg/mz · '
-                  '${_number(product.gramsPerPlant)} g/planta',
+                  '${_number(manzana)} $unit/mz · '
+                  '${_number(perPlant)} $plantUnit/planta',
                   style: const TextStyle(
                     color: _FertilizationPlanScreenState._muted,
                     fontSize: 11,
                   ),
                 ),
+                if (dose != null && unit == 'kg' && amount >= 1000)
+                  Text(
+                    '${(amount / 1000).toStringAsFixed(3)} t/ha · referencia',
+                    style: const TextStyle(
+                      color: _FertilizationPlanScreenState._muted,
+                      fontSize: 11,
+                    ),
+                  ),
               ],
             ),
           ),
           const SizedBox(width: 8),
           Text.rich(
             TextSpan(
-              text: _number(product.kgPerHectare),
-              children: const [
+              text: _number(amount),
+              children: [
                 TextSpan(
-                  text: '\nkg/ha',
-                  style: TextStyle(fontSize: 10, fontWeight: FontWeight.w500),
+                  text: '\n$unit/ha',
+                  style: const TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w500,
+                  ),
                 ),
               ],
             ),
@@ -662,9 +755,11 @@ class _NoticeCard extends StatelessWidget {
             children: [
               Icon(icon, color: color, size: 19),
               const SizedBox(width: 8),
-              Text(
-                title,
-                style: TextStyle(color: color, fontWeight: FontWeight.w800),
+              Expanded(
+                child: Text(
+                  title,
+                  style: TextStyle(color: color, fontWeight: FontWeight.w800),
+                ),
               ),
             ],
           ),

@@ -13,7 +13,7 @@ void main() {
     expect(client.getCalls, 1);
     expect(client.postCalls, 0);
     expect(client.lastPath, '/fertilization/plans/latest');
-    expect(client.lastQuery, {'parcel_id': 'parcel-1'});
+    expect(client.lastQuery, {'parcel_id': 'parcel-1', 'include_organic': 'true'});
   });
 }
 
