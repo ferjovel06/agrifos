@@ -16,6 +16,9 @@ export MSYS_NO_PATHCONV=1 MSYS2_ARG_CONV_EXCL='*'
 # https://github.com/aquasecurity/trivy/releases/tag/v0.75.0
 hadolint_version=2.15.1
 trivy_image='aquasec/trivy:0.75.0@sha256:af6acf9a6b85dfe389a1941505c0ce9efef52a4719635e1a962f022a3d855daa'
+# Verification needs only Python's stdlib. Do not execute the scanned local ID:
+# a concurrent build may untag/remove its OCI index after the archive is saved.
+identity_image='python:3.13.16-slim-trixie@sha256:bf44cdfcb76cd3b41e879bc058fc37ec5872002ccfde7fcb765e218cde0cd79c'
 
 fail() { printf 'FAIL: %s\n' "$*" >&2; exit 1; }
 native_path() {
@@ -160,7 +163,7 @@ check_images() {
       --cap-drop ALL --security-opt no-new-privileges:true \
       --mount "type=bind,source=$(native_path "$evidence_dir"),target=/evidence" \
       --mount "type=bind,source=$(native_path "$repo_root/docker/verify_scan_identity.py"),target=/verify.py,readonly" \
-      "$runtime_id" python /verify.py /evidence/runtime-image.tar /evidence/trivy-runtime.json \
+      "$identity_image" python /verify.py /evidence/runtime-image.tar /evidence/trivy-runtime.json \
         /evidence/runtime-identity.json "$runtime_id" || identity_status=$?
   else
     printf 'NOT RUN: runtime identity check; this scan produced no report.\n' >&2
