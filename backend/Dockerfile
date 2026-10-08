@@ -51,6 +51,8 @@ CMD ["uv", "run", "--no-sync", "python", "-m", "unittest", "discover", "-s", "te
 FROM base AS runtime
 
 ENV ENV=production
+# The base interpreter's pip vendors are not needed by the isolated app venv.
+RUN /usr/local/bin/python -m pip uninstall --yes pip
 COPY --from=dependencies /opt/venv /opt/venv
 COPY --chown=agrifos:agrifos alembic.ini ./
 COPY --chown=agrifos:agrifos app ./app
