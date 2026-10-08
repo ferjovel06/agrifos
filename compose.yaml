@@ -11,6 +11,8 @@ x-backend-config: &backend-config
   environment: *backend-environment
   networks: [supabase]
   init: true
+  cap_drop: [ALL]
+  security_opt: ["no-new-privileges:true"]
 
 services:
   migrate:
