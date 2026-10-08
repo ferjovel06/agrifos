@@ -28,3 +28,11 @@ data_analysis/
 docs/rules/**
 
 tmp/
+
+# Local container configuration, downloaded tools and exported artifacts
+.docker/
+.tools/
+artifacts/
+supabase/.local/
+docker/**/__pycache__/
+docker/**/*.pyc
