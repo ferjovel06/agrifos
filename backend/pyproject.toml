@@ -5,7 +5,7 @@ requires-python = ">=3.11"
 dependencies = [
     "alembic>=1.13.0",
     "asyncpg>=0.31.0",
-    "pyjwt[crypto]>=2.8.0",
+    "pyjwt[crypto]>=2.14.0",
     "fastapi[standard]>=0.141.1",
     "httpx>=0.28.1,<1.0",
     "psycopg2-binary>=2.9.12",
@@ -16,3 +16,7 @@ dependencies = [
 
 [tool.fastapi]
 entrypoint = "app.main:app"
+
+[tool.uv]
+# urllib3 is transitive through fastapi-cli/cloud-cli/sentry-sdk.
+constraint-dependencies = ["urllib3>=2.8.0"]
