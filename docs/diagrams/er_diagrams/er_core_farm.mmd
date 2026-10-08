@@ -1,56 +1,61 @@
 erDiagram
-  USER ||--o{ FARM : owns
-  FARM ||--o{ PARCEL : contains
-  CROP ||--o{ PARCEL : grows
-  CROP ||--o{ VARIETY : has
-  VARIETY o|--o{ PARCEL : specifies
-
-  USER {
-    uuid id PK
-    string name
-    string email
-    string role
-    date birth_date
-    string gender
-    string phone
-    string country
-    string department
-    string address
-    datetime created_at
-    datetime updated_at
-  }
-  FARM {
-    uuid id PK
-    datetime created_at
-    datetime updated_at
-    uuid user_id FK
-    string name
-    float area_hectares
-    float latitude
-    float longitude
-  }
-  PARCEL {
-    uuid id PK
-    datetime created_at
-    datetime updated_at
-    uuid farm_id FK
-    uuid crop_id FK
-    uuid variety_id FK
-    string name
-    float area_hectares
-    int plants_per_hectare
-    Date planting_date
-  }
-  CROP {
-    uuid id PK
-    datetime created_at
-    datetime updated_at
-    string name
-  }
-  VARIETY {
-    uuid id PK
-    datetime created_at
-    datetime updated_at
-    uuid crop_id FK
-    string name
-  }
+    %% AUTH_USER is external Supabase auth.users, represented by its id only.
+    %% SQLAlchemy models at main f986ccb; 2026-10-08.
+    AUTH_USER ||--o| USER : id
+    USER ||--o{ FARM : user_id
+    CROP ||--o{ PARCEL : crop_id
+    FARM ||--o{ PARCEL : farm_id
+    VARIETY o|--o{ PARCEL : variety_id
+    CROP ||--o{ VARIETY : crop_id
+    AUTH_USER {
+        uuid id PK
+    }
+    USER {
+        uuid id PK,FK
+        string name
+        string email UK
+        string role
+        date birth_date "nullable"
+        string gender "nullable"
+        string phone "nullable"
+        string country "nullable"
+        string department "nullable"
+        string address "nullable"
+        datetime created_at
+        datetime updated_at
+    }
+    FARM {
+        uuid user_id FK
+        string name
+        float area_hectares
+        float latitude
+        float longitude
+        uuid id PK
+        datetime created_at
+        datetime updated_at
+    }
+    PARCEL {
+        uuid farm_id FK
+        uuid crop_id FK
+        uuid variety_id FK "nullable"
+        string name
+        float area_hectares
+        int plants_per_hectare "nullable"
+        date planting_date
+        uuid id PK
+        datetime created_at
+        datetime updated_at
+    }
+    CROP {
+        string name UK
+        uuid id PK
+        datetime created_at
+        datetime updated_at
+    }
+    VARIETY {
+        uuid crop_id FK
+        string name
+        uuid id PK
+        datetime created_at
+        datetime updated_at
+    }

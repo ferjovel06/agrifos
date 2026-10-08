@@ -1,80 +1,116 @@
 erDiagram
-  PARCEL ||--o{ FERTILIZATION_PLAN : generates
-  READING o|--o{ FERTILIZATION_PLAN : originates
-  LAB_ANALYSIS o|--o{ FERTILIZATION_PLAN : originates
-  AGRONOMIC_REFERENCE_SET ||--o{ FERTILIZATION_PLAN : reproduces
-  FERTILIZATION_PLAN ||--o{ FERTILIZATION_PLAN_ITEM : contains
-  FERTILIZER_PRODUCT ||--o{ FERTILIZATION_PLAN_ITEM : recommends
-
-  PARCEL {
-    uuid id PK
-    uuid farm_id FK
-    uuid crop_id FK
-    string name
-  }
-  READING {
-    uuid id PK
-    uuid parcel_id FK
-    float nitrogen
-    float phosphorus
-    float potassium
-  }
-  LAB_ANALYSIS {
-    uuid id PK
-    uuid parcel_id FK
-    float ph
-    float organic_matter_pct
-    float nitrogen
-    float phosphorus
-    float potassium
-  }
-  AGRONOMIC_REFERENCE_SET {
-    uuid id PK
-    string key
-    string version
-    string source
-  }
-  FERTILIZER_PRODUCT {
-    uuid id PK
-    uuid reference_set_id FK
-    string key
-    string name
-    boolean is_active
-  }
-  FERTILIZATION_PLAN {
-    uuid id PK
-    uuid parcel_id FK
-    uuid reading_id FK
-    uuid lab_analysis_id FK
-    uuid reference_set_id FK
-    string method
-    string input_fingerprint
-    json recommendation_snapshot
-    float target_green_kg_ha
-    int plant_age_months
-    string life_stage
-    string fruit_stage
-    string engine_version
-    string recommendation_status
-    json nutrient_requirements
-    json limiting_nutrients
-    json warnings
-    json assumptions
-    datetime generated_at
-  }
-  FERTILIZATION_PLAN_ITEM {
-    uuid id PK
-    uuid plan_id FK
-    uuid fertilizer_product_id FK
-    string scenario_name
-    string selection_method
-    boolean scenario_is_valid
-    int application_number
-    string moment
-    float fraction
-    float kg_ha
-    float kg_manzana
-    float g_plant
-    json guaranteed_analysis_pct
-    json nutrient_contributions_kg_ha
-  }
+    %% SQLAlchemy models at main f986ccb; 2026-10-08.
+    PARCEL ||--o{ READING : parcel_id
+    PARCEL ||--o{ LAB_ANALYSIS : parcel_id
+    LAB_ANALYSIS o|--o{ FERTILIZATION_PLAN : lab_analysis_id
+    PARCEL ||--o{ FERTILIZATION_PLAN : parcel_id
+    READING o|--o{ FERTILIZATION_PLAN : reading_id
+    AGRONOMIC_REFERENCE_SET ||--o{ FERTILIZATION_PLAN : reference_set_id
+    FERTILIZER_PRODUCT ||--o{ FERTILIZATION_PLAN_ITEM : fertilizer_product_id
+    FERTILIZATION_PLAN ||--o{ FERTILIZATION_PLAN_ITEM : plan_id
+    AGRONOMIC_REFERENCE_SET ||--o{ FERTILIZER_PRODUCT : reference_set_id
+    PARCEL {
+        uuid farm_id FK
+        uuid crop_id FK
+        uuid variety_id FK "nullable"
+        string name
+        float area_hectares
+        int plants_per_hectare "nullable"
+        date planting_date
+        uuid id PK
+        datetime created_at
+        datetime updated_at
+    }
+    READING {
+        uuid parcel_id FK
+        float nitrogen
+        float phosphorus
+        float potassium
+        float ec
+        float ph
+        float temperature
+        float humidity
+        datetime recorded_at
+        uuid id PK
+    }
+    LAB_ANALYSIS {
+        uuid parcel_id FK
+        string sample_code "nullable"
+        datetime sampled_at "nullable"
+        float depth_start_cm "nullable"
+        float depth_end_cm "nullable"
+        float ph
+        string ph_method "nullable"
+        float ec "nullable"
+        string ec_method "nullable"
+        float organic_matter_pct
+        float cic
+        float clay_pct
+        float silt_pct
+        float sand_pct
+        float nitrogen
+        float phosphorus
+        string phosphorus_method "nullable"
+        float potassium
+        string potassium_method "nullable"
+        float calcium
+        float magnesium
+        float sulfur
+        string lab
+        datetime recorded_at
+        uuid id PK
+    }
+    FERTILIZATION_PLAN {
+        uuid parcel_id FK
+        uuid reading_id FK "nullable"
+        uuid lab_analysis_id FK "nullable"
+        uuid reference_set_id FK
+        string method
+        string input_fingerprint "nullable"
+        json recommendation_snapshot "nullable"
+        float target_green_kg_ha
+        int plant_age_months
+        string life_stage
+        string fruit_stage
+        string engine_version
+        string recommendation_status
+        json nutrient_requirements
+        json limiting_nutrients
+        json warnings
+        json assumptions
+        datetime generated_at
+        uuid id PK
+    }
+    FERTILIZATION_PLAN_ITEM {
+        uuid plan_id FK
+        uuid fertilizer_product_id FK
+        string scenario_name
+        string selection_method
+        bool scenario_is_valid
+        int application_number
+        string moment
+        float fraction
+        float kg_ha
+        float kg_manzana
+        float g_plant
+        json guaranteed_analysis_pct
+        json nutrient_contributions_kg_ha
+        uuid id PK
+    }
+    AGRONOMIC_REFERENCE_SET {
+        string key
+        string version
+        string source
+        string description "nullable"
+        bool is_active
+        datetime created_at
+        uuid id PK
+    }
+    FERTILIZER_PRODUCT {
+        uuid reference_set_id FK
+        string key
+        string name
+        bool is_low_chloride
+        bool is_active
+        uuid id PK
+    }

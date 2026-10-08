@@ -1,40 +1,134 @@
----
-config:
-  layout: elk
----
 erDiagram
-  AGRONOMIC_REFERENCE_SET ||--o{ SOIL_REFERENCE_RANGE : versions
-  AGRONOMIC_REFERENCE_SET ||--o{ FERTILIZER_PRODUCT : versions
-  AGRONOMIC_REFERENCE_SET ||--o{ APPLICATION_SCHEDULE_RULE : versions
-  AGRONOMIC_REFERENCE_SET ||--o{ AGRONOMIC_PARAMETER : versions
-  AGRONOMIC_REFERENCE_SET o|--o{ OPTIMAL_REQUIREMENT : versions
-  AGRONOMIC_REFERENCE_SET o|--o{ EXTRACTION_INDEX : versions
-  AGRONOMIC_REFERENCE_SET o|--o{ VARIETY_FACTOR : versions
-  AGRONOMIC_REFERENCE_SET o|--o{ STAGE_FACTOR : versions
-  AGRONOMIC_REFERENCE_SET o|--o{ EFFICIENCY_FACTOR : versions
-  CROP ||--o{ SOIL_REFERENCE_RANGE : defines
-  CROP ||--o{ APPLICATION_SCHEDULE_RULE : schedules
-  CROP ||--o{ AGRONOMIC_PARAMETER : configures
-  CROP ||--o{ OPTIMAL_REQUIREMENT : sets
-  CROP ||--o{ EXTRACTION_INDEX : defines
-  PHENOLOGICAL_STAGE_TEMPLATE ||--o{ OPTIMAL_REQUIREMENT : applies
-  PHENOLOGICAL_STAGE_TEMPLATE ||--o{ STAGE_FACTOR : adjusts
-  VARIETY ||--o{ VARIETY_FACTOR : adjusts
-  SOIL_TYPE ||--o{ EFFICIENCY_FACTOR : defines
-  FERTILIZER_PRODUCT ||--|{ FERTILIZER_PRODUCT_NUTRIENT : contains
-
-  AGRONOMIC_REFERENCE_SET { string key }
-  SOIL_REFERENCE_RANGE { string parameter }
-  FERTILIZER_PRODUCT { string key }
-  FERTILIZER_PRODUCT_NUTRIENT { string nutrient }
-  APPLICATION_SCHEDULE_RULE { string life_stage }
-  AGRONOMIC_PARAMETER { string key }
-  OPTIMAL_REQUIREMENT { string nutrient }
-  EXTRACTION_INDEX { string nutrient }
-  VARIETY_FACTOR { string nutrient }
-  STAGE_FACTOR { string nutrient }
-  SOIL_TYPE { string name }
-  EFFICIENCY_FACTOR { string nutrient }
-  CROP { string name }
-  VARIETY { string name }
-  PHENOLOGICAL_STAGE_TEMPLATE { uuid id PK }
+    %% SQLAlchemy models at main f986ccb; 2026-10-08.
+    CROP ||--o{ VARIETY : crop_id
+    CROP ||--o{ OPTIMAL_REQUIREMENT : crop_id
+    AGRONOMIC_REFERENCE_SET o|--o{ OPTIMAL_REQUIREMENT : reference_set_id
+    CROP ||--o{ EXTRACTION_INDEX : crop_id
+    AGRONOMIC_REFERENCE_SET o|--o{ EXTRACTION_INDEX : reference_set_id
+    AGRONOMIC_REFERENCE_SET o|--o{ VARIETY_FACTOR : reference_set_id
+    VARIETY ||--o{ VARIETY_FACTOR : variety_id
+    AGRONOMIC_REFERENCE_SET o|--o{ STAGE_FACTOR : reference_set_id
+    AGRONOMIC_REFERENCE_SET o|--o{ EFFICIENCY_FACTOR : reference_set_id
+    SOIL_TYPE ||--o{ EFFICIENCY_FACTOR : soil_type_id
+    CROP ||--o{ SOIL_REFERENCE_RANGE : crop_id
+    AGRONOMIC_REFERENCE_SET ||--o{ SOIL_REFERENCE_RANGE : reference_set_id
+    AGRONOMIC_REFERENCE_SET ||--o{ FERTILIZER_PRODUCT : reference_set_id
+    FERTILIZER_PRODUCT ||--o{ FERTILIZER_PRODUCT_NUTRIENT : product_id
+    CROP ||--o{ APPLICATION_SCHEDULE_RULE : crop_id
+    AGRONOMIC_REFERENCE_SET ||--o{ APPLICATION_SCHEDULE_RULE : reference_set_id
+    CROP ||--o{ AGRONOMIC_PARAMETER : crop_id
+    AGRONOMIC_REFERENCE_SET ||--o{ AGRONOMIC_PARAMETER : reference_set_id
+    CROP {
+        string name UK
+        uuid id PK
+        datetime created_at
+        datetime updated_at
+    }
+    VARIETY {
+        uuid crop_id FK
+        string name
+        uuid id PK
+        datetime created_at
+        datetime updated_at
+    }
+    OPTIMAL_REQUIREMENT {
+        uuid reference_set_id FK "nullable"
+        uuid crop_id FK
+        uuid stage_id FK
+        string nutrient
+        float min_value
+        float max_value
+        uuid id PK
+    }
+    EXTRACTION_INDEX {
+        uuid reference_set_id FK "nullable"
+        uuid crop_id FK
+        string nutrient
+        float ie_value
+        uuid id PK
+    }
+    VARIETY_FACTOR {
+        uuid reference_set_id FK "nullable"
+        uuid variety_id FK
+        string nutrient
+        float fv_factor
+        uuid id PK
+    }
+    STAGE_FACTOR {
+        uuid reference_set_id FK "nullable"
+        uuid stage_id FK
+        string nutrient
+        float fe_factor
+        uuid id PK
+    }
+    SOIL_TYPE {
+        string name UK
+        string description "nullable"
+        uuid id PK
+    }
+    EFFICIENCY_FACTOR {
+        uuid reference_set_id FK "nullable"
+        uuid soil_type_id FK
+        string nutrient
+        float ef_min
+        float ef_max
+        uuid id PK
+    }
+    AGRONOMIC_REFERENCE_SET {
+        string key
+        string version
+        string source
+        string description "nullable"
+        bool is_active
+        datetime created_at
+        uuid id PK
+    }
+    SOIL_REFERENCE_RANGE {
+        uuid reference_set_id FK
+        uuid crop_id FK
+        string parameter
+        string label_es
+        string unit
+        string method
+        string confidence
+        float deficient_below "nullable"
+        float optimal_min "nullable"
+        float optimal_max "nullable"
+        float critical_above "nullable"
+        bool high_is_generally_favorable
+        string notes
+        uuid id PK
+    }
+    FERTILIZER_PRODUCT {
+        uuid reference_set_id FK
+        string key
+        string name
+        bool is_low_chloride
+        bool is_active
+        uuid id PK
+    }
+    FERTILIZER_PRODUCT_NUTRIENT {
+        uuid product_id FK
+        string nutrient
+        float fraction
+        uuid id PK
+    }
+    APPLICATION_SCHEDULE_RULE {
+        uuid reference_set_id FK
+        uuid crop_id FK
+        string life_stage
+        int sequence
+        string moment
+        int month_after_planting "nullable"
+        float fraction
+        uuid id PK
+    }
+    AGRONOMIC_PARAMETER {
+        uuid reference_set_id FK
+        uuid crop_id FK
+        string key
+        float value
+        string unit "nullable"
+        string notes "nullable"
+        uuid id PK
+    }

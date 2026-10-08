@@ -1,231 +1,59 @@
 classDiagram
-    %% Persisted SQLAlchemy models; reviewed 2026-09-05.
-    %% Nullable fields use the optional marker; relationships follow foreign keys.
-    class AgronomicReferenceSet {
-        uuid id PK
-        str key
-        str version
-        str source
-        str description optional
-        bool is_active
-        datetime created_at
+    %% Persisted SQLAlchemy classes at main f986ccb; 2026-10-08.
+    class AuthUser {
+        uuid id
     }
-    class SoilReferenceRange {
-        uuid id PK
-        uuid reference_set_id FK
-        uuid crop_id FK
-        str parameter
-        str label_es
-        str unit
-        str method
-        str confidence
-        float deficient_below optional
-        float optimal_min optional
-        float optimal_max optional
-        float critical_above optional
-        bool high_is_generally_favorable
-        str notes
-    }
-    class FertilizerProduct {
-        uuid id PK
-        uuid reference_set_id FK
-        str key
-        str name
-        bool is_low_chloride
-        bool is_active
-    }
-    class FertilizerProductNutrient {
-        uuid id PK
-        uuid product_id FK
-        str nutrient
-        float fraction
-    }
-    class ApplicationScheduleRule {
-        uuid id PK
-        uuid reference_set_id FK
-        uuid crop_id FK
-        str life_stage
-        int sequence
-        str moment
-        int month_after_planting optional
-        float fraction
-    }
-    class AgronomicParameter {
-        uuid id PK
-        uuid reference_set_id FK
-        uuid crop_id FK
-        str key
-        float value
-        str unit optional
-        str notes optional
-    }
-    class Alert {
-        uuid id PK
-        uuid farm_id FK
-        uuid parcel_id FK optional
-        str type
-        str title
-        str message
-        str severity
-        date event_date optional
-        float risk_score optional
-        bool is_active
-        datetime created_at
-    }
-    class Crop {
-        uuid id PK
+    class User {
+        uuid id
+        string name
+        string email
+        string role
+        date birth_date optional
+        string gender optional
+        string phone optional
+        string country optional
+        string department optional
+        string address optional
         datetime created_at
         datetime updated_at
-        str name
-    }
-    class Variety {
-        uuid id PK
-        datetime created_at
-        datetime updated_at
-        uuid crop_id FK
-        str name
     }
     class Farm {
-        uuid id PK
-        datetime created_at
-        datetime updated_at
-        uuid user_id FK
-        str name
+        uuid user_id
+        string name
         float area_hectares
         float latitude
         float longitude
-    }
-    class Parcel {
-        uuid id PK
+        uuid id
         datetime created_at
         datetime updated_at
-        uuid farm_id FK
-        uuid crop_id FK
-        uuid variety_id FK optional
-        str name
+    }
+    class Parcel {
+        uuid farm_id
+        uuid crop_id
+        uuid variety_id optional
+        string name
         float area_hectares
         int plants_per_hectare optional
-        Date planting_date
+        date planting_date
+        uuid id
+        datetime created_at
+        datetime updated_at
     }
-    class OptimalRequirement {
-        uuid id PK
-        uuid reference_set_id FK optional
-        uuid crop_id FK
-        uuid stage_id FK
-        str nutrient
-        float min_value
-        float max_value
+    class Crop {
+        string name
+        uuid id
+        datetime created_at
+        datetime updated_at
     }
-    class ExtractionIndex {
-        uuid id PK
-        uuid reference_set_id FK optional
-        uuid crop_id FK
-        str nutrient
-        float ie_value
-    }
-    class VarietyFactor {
-        uuid id PK
-        uuid reference_set_id FK optional
-        uuid variety_id FK
-        str nutrient
-        float fv_factor
-    }
-    class StageFactor {
-        uuid id PK
-        uuid reference_set_id FK optional
-        uuid stage_id FK
-        str nutrient
-        float fe_factor
-    }
-    class SoilType {
-        uuid id PK
-        str name
-        str description optional
-    }
-    class EfficiencyFactor {
-        uuid id PK
-        uuid reference_set_id FK optional
-        uuid soil_type_id FK
-        str nutrient
-        float ef_min
-        float ef_max
-    }
-    class FertilizationPlan {
-        uuid id PK
-        uuid parcel_id FK
-        uuid reading_id FK optional
-        uuid lab_analysis_id FK optional
-        uuid reference_set_id FK
-        str method
-        str input_fingerprint optional
-        JSON recommendation_snapshot optional
-        float target_green_kg_ha
-        int plant_age_months
-        str life_stage
-        str fruit_stage
-        str engine_version
-        str recommendation_status
-        JSON nutrient_requirements
-        JSON limiting_nutrients
-        JSON warnings
-        JSON assumptions
-        datetime generated_at
-    }
-    class FertilizationPlanItem {
-        uuid id PK
-        uuid plan_id FK
-        uuid fertilizer_product_id FK
-        str scenario_name
-        str selection_method
-        bool scenario_is_valid
-        int application_number
-        str moment
-        float fraction
-        float kg_ha
-        float kg_manzana
-        float g_plant
-        JSON guaranteed_analysis_pct
-        JSON nutrient_contributions_kg_ha
-    }
-    class Expense {
-        uuid id PK
-        uuid farm_id FK
-        str category
-        float amount
-        date expense_date
-    }
-    class Income {
-        uuid id PK
-        uuid farm_id FK
-        float amount
-        date income_date
-    }
-    class Production {
-        uuid id PK
-        uuid farm_id FK
-        uuid income_id FK optional
-        float quantity
-        str unit
-        date harvest_date
-    }
-    class PhenologicalStageTemplate {
-        uuid id PK
-        uuid crop_id FK
-        str name
-        int stage_order
-        int duration_days optional
-    }
-    class ParcelPhenologicalStage {
-        uuid id PK
-        uuid parcel_id FK
-        uuid template_id FK
-        date estimated_date optional
-        date actual_date optional
-        datetime selected_at
+    class Variety {
+        uuid crop_id
+        string name
+        uuid id
+        datetime created_at
+        datetime updated_at
     }
     class Reading {
-        uuid id PK
-        uuid parcel_id FK
+        uuid parcel_id
         float nitrogen
         float phosphorus
         float potassium
@@ -234,18 +62,18 @@ classDiagram
         float temperature
         float humidity
         datetime recorded_at
+        uuid id
     }
     class LabAnalysis {
-        uuid id PK
-        uuid parcel_id FK
-        str sample_code optional
+        uuid parcel_id
+        string sample_code optional
         datetime sampled_at optional
         float depth_start_cm optional
         float depth_end_cm optional
         float ph
-        str ph_method optional
+        string ph_method optional
         float ec optional
-        str ec_method optional
+        string ec_method optional
         float organic_matter_pct
         float cic
         float clay_pct
@@ -253,67 +81,243 @@ classDiagram
         float sand_pct
         float nitrogen
         float phosphorus
-        str phosphorus_method optional
+        string phosphorus_method optional
         float potassium
-        str potassium_method optional
+        string potassium_method optional
         float calcium
         float magnesium
         float sulfur
-        str lab
+        string lab
         datetime recorded_at
+        uuid id
     }
-    class User {
-        uuid id PK
+    class PhenologicalStageTemplate {
+        uuid crop_id
         string name
-        string email
-        string role
-        date birth_date
-        string gender
-        string phone
-        string country
-        string department
-        string address
-        datetime created_at
-        datetime updated_at
+        int stage_order
+        int duration_days optional
+        uuid id
     }
-    AgronomicReferenceSet "1" --> "*" SoilReferenceRange : reference_set_id
-    Crop "1" --> "*" SoilReferenceRange : crop_id
-    AgronomicReferenceSet "1" --> "*" FertilizerProduct : reference_set_id
-    FertilizerProduct "1" --> "*" FertilizerProductNutrient : product_id
-    AgronomicReferenceSet "1" --> "*" ApplicationScheduleRule : reference_set_id
-    Crop "1" --> "*" ApplicationScheduleRule : crop_id
-    AgronomicReferenceSet "1" --> "*" AgronomicParameter : reference_set_id
-    Crop "1" --> "*" AgronomicParameter : crop_id
-    Farm "1" --> "*" Alert : farm_id
-    Parcel "0..1" --> "*" Alert : parcel_id
-    Crop "1" --> "*" Variety : crop_id
-    User "1" --> "*" Farm : user_id
-    Farm "1" --> "*" Parcel : farm_id
-    Crop "1" --> "*" Parcel : crop_id
-    Variety "0..1" --> "*" Parcel : variety_id
-    AgronomicReferenceSet "0..1" --> "*" OptimalRequirement : reference_set_id
-    Crop "1" --> "*" OptimalRequirement : crop_id
-    PhenologicalStageTemplate "1" --> "*" OptimalRequirement : stage_id
-    AgronomicReferenceSet "0..1" --> "*" ExtractionIndex : reference_set_id
-    Crop "1" --> "*" ExtractionIndex : crop_id
-    AgronomicReferenceSet "0..1" --> "*" VarietyFactor : reference_set_id
-    Variety "1" --> "*" VarietyFactor : variety_id
-    AgronomicReferenceSet "0..1" --> "*" StageFactor : reference_set_id
-    PhenologicalStageTemplate "1" --> "*" StageFactor : stage_id
-    AgronomicReferenceSet "0..1" --> "*" EfficiencyFactor : reference_set_id
-    SoilType "1" --> "*" EfficiencyFactor : soil_type_id
-    Parcel "1" --> "*" FertilizationPlan : parcel_id
-    Reading "0..1" --> "*" FertilizationPlan : reading_id
-    LabAnalysis "0..1" --> "*" FertilizationPlan : lab_analysis_id
-    AgronomicReferenceSet "1" --> "*" FertilizationPlan : reference_set_id
-    FertilizationPlan "1" --> "*" FertilizationPlanItem : plan_id
-    FertilizerProduct "1" --> "*" FertilizationPlanItem : fertilizer_product_id
-    Farm "1" --> "*" Expense : farm_id
-    Farm "1" --> "*" Income : farm_id
-    Farm "1" --> "*" Production : farm_id
-    Income "0..1" --> "*" Production : income_id
-    Crop "1" --> "*" PhenologicalStageTemplate : crop_id
-    Parcel "1" --> "*" ParcelPhenologicalStage : parcel_id
-    PhenologicalStageTemplate "1" --> "*" ParcelPhenologicalStage : template_id
-    Parcel "1" --> "*" Reading : parcel_id
-    Parcel "1" --> "*" LabAnalysis : parcel_id
+    class ParcelPhenologicalStage {
+        uuid parcel_id
+        uuid template_id
+        date estimated_date optional
+        date actual_date optional
+        datetime selected_at
+        uuid id
+    }
+    class OptimalRequirement {
+        uuid reference_set_id optional
+        uuid crop_id
+        uuid stage_id
+        string nutrient
+        float min_value
+        float max_value
+        uuid id
+    }
+    class ExtractionIndex {
+        uuid reference_set_id optional
+        uuid crop_id
+        string nutrient
+        float ie_value
+        uuid id
+    }
+    class VarietyFactor {
+        uuid reference_set_id optional
+        uuid variety_id
+        string nutrient
+        float fv_factor
+        uuid id
+    }
+    class StageFactor {
+        uuid reference_set_id optional
+        uuid stage_id
+        string nutrient
+        float fe_factor
+        uuid id
+    }
+    class SoilType {
+        string name
+        string description optional
+        uuid id
+    }
+    class EfficiencyFactor {
+        uuid reference_set_id optional
+        uuid soil_type_id
+        string nutrient
+        float ef_min
+        float ef_max
+        uuid id
+    }
+    class FertilizationPlan {
+        uuid parcel_id
+        uuid reading_id optional
+        uuid lab_analysis_id optional
+        uuid reference_set_id
+        string method
+        string input_fingerprint optional
+        json recommendation_snapshot optional
+        float target_green_kg_ha
+        int plant_age_months
+        string life_stage
+        string fruit_stage
+        string engine_version
+        string recommendation_status
+        json nutrient_requirements
+        json limiting_nutrients
+        json warnings
+        json assumptions
+        datetime generated_at
+        uuid id
+    }
+    class FertilizationPlanItem {
+        uuid plan_id
+        uuid fertilizer_product_id
+        string scenario_name
+        string selection_method
+        bool scenario_is_valid
+        int application_number
+        string moment
+        float fraction
+        float kg_ha
+        float kg_manzana
+        float g_plant
+        json guaranteed_analysis_pct
+        json nutrient_contributions_kg_ha
+        uuid id
+    }
+    class AgronomicReferenceSet {
+        string key
+        string version
+        string source
+        string description optional
+        bool is_active
+        datetime created_at
+        uuid id
+    }
+    class SoilReferenceRange {
+        uuid reference_set_id
+        uuid crop_id
+        string parameter
+        string label_es
+        string unit
+        string method
+        string confidence
+        float deficient_below optional
+        float optimal_min optional
+        float optimal_max optional
+        float critical_above optional
+        bool high_is_generally_favorable
+        string notes
+        uuid id
+    }
+    class FertilizerProduct {
+        uuid reference_set_id
+        string key
+        string name
+        bool is_low_chloride
+        bool is_active
+        uuid id
+    }
+    class FertilizerProductNutrient {
+        uuid product_id
+        string nutrient
+        float fraction
+        uuid id
+    }
+    class ApplicationScheduleRule {
+        uuid reference_set_id
+        uuid crop_id
+        string life_stage
+        int sequence
+        string moment
+        int month_after_planting optional
+        float fraction
+        uuid id
+    }
+    class AgronomicParameter {
+        uuid reference_set_id
+        uuid crop_id
+        string key
+        float value
+        string unit optional
+        string notes optional
+        uuid id
+    }
+    class Alert {
+        uuid farm_id
+        uuid parcel_id optional
+        string type
+        string title
+        string message
+        string severity
+        date event_date optional
+        float risk_score optional
+        bool is_active
+        datetime created_at
+        uuid id
+    }
+    class Expense {
+        uuid farm_id
+        string category
+        decimal amount
+        date expense_date
+        uuid id
+    }
+    class Income {
+        uuid farm_id
+        string category
+        decimal amount
+        date income_date
+        uuid id
+    }
+    class Production {
+        uuid farm_id
+        uuid income_id optional
+        float quantity
+        string unit
+        date harvest_date
+        uuid id
+    }
+    AuthUser "1" --> "0..1" User : id
+    User "1..1" --> "0..*" Farm : user_id
+    Crop "1..1" --> "0..*" Parcel : crop_id
+    Farm "1..1" --> "0..*" Parcel : farm_id
+    Variety "0..1" --> "0..*" Parcel : variety_id
+    Crop "1..1" --> "0..*" Variety : crop_id
+    Parcel "1..1" --> "0..*" Reading : parcel_id
+    Parcel "1..1" --> "0..*" LabAnalysis : parcel_id
+    Crop "1..1" --> "0..*" PhenologicalStageTemplate : crop_id
+    Parcel "1..1" --> "0..*" ParcelPhenologicalStage : parcel_id
+    PhenologicalStageTemplate "1..1" --> "0..*" ParcelPhenologicalStage : template_id
+    Crop "1..1" --> "0..*" OptimalRequirement : crop_id
+    AgronomicReferenceSet "0..1" --> "0..*" OptimalRequirement : reference_set_id
+    PhenologicalStageTemplate "1..1" --> "0..*" OptimalRequirement : stage_id
+    Crop "1..1" --> "0..*" ExtractionIndex : crop_id
+    AgronomicReferenceSet "0..1" --> "0..*" ExtractionIndex : reference_set_id
+    AgronomicReferenceSet "0..1" --> "0..*" VarietyFactor : reference_set_id
+    Variety "1..1" --> "0..*" VarietyFactor : variety_id
+    AgronomicReferenceSet "0..1" --> "0..*" StageFactor : reference_set_id
+    PhenologicalStageTemplate "1..1" --> "0..*" StageFactor : stage_id
+    AgronomicReferenceSet "0..1" --> "0..*" EfficiencyFactor : reference_set_id
+    SoilType "1..1" --> "0..*" EfficiencyFactor : soil_type_id
+    LabAnalysis "0..1" --> "0..*" FertilizationPlan : lab_analysis_id
+    Parcel "1..1" --> "0..*" FertilizationPlan : parcel_id
+    Reading "0..1" --> "0..*" FertilizationPlan : reading_id
+    AgronomicReferenceSet "1..1" --> "0..*" FertilizationPlan : reference_set_id
+    FertilizerProduct "1..1" --> "0..*" FertilizationPlanItem : fertilizer_product_id
+    FertilizationPlan "1..1" --> "0..*" FertilizationPlanItem : plan_id
+    Crop "1..1" --> "0..*" SoilReferenceRange : crop_id
+    AgronomicReferenceSet "1..1" --> "0..*" SoilReferenceRange : reference_set_id
+    AgronomicReferenceSet "1..1" --> "0..*" FertilizerProduct : reference_set_id
+    FertilizerProduct "1..1" --> "0..*" FertilizerProductNutrient : product_id
+    Crop "1..1" --> "0..*" ApplicationScheduleRule : crop_id
+    AgronomicReferenceSet "1..1" --> "0..*" ApplicationScheduleRule : reference_set_id
+    Crop "1..1" --> "0..*" AgronomicParameter : crop_id
+    AgronomicReferenceSet "1..1" --> "0..*" AgronomicParameter : reference_set_id
+    Farm "1..1" --> "0..*" Alert : farm_id
+    Parcel "0..1" --> "0..*" Alert : parcel_id
+    Farm "1..1" --> "0..*" Expense : farm_id
+    Farm "1..1" --> "0..*" Income : farm_id
+    Farm "1..1" --> "0..*" Production : farm_id
+    Income "0..1" --> "0..*" Production : income_id
