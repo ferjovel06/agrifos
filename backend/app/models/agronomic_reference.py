@@ -8,10 +8,12 @@ from sqlalchemy import (
     Float,
     ForeignKey,
     Integer,
+    Index,
     String,
     Text,
     UniqueConstraint,
     func,
+    text,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -25,6 +27,10 @@ class AgronomicReferenceSet(Base, UUIDPKMixin):
     __tablename__ = "agronomic_reference_sets"
     __table_args__ = (
         UniqueConstraint("key", "version", name="uq_reference_set_key_version"),
+        Index(
+            "ix_agronomic_reference_sets_active", "key", unique=True,
+            postgresql_where=text("is_active"),
+        ),
     )
 
     key: Mapped[str] = mapped_column(String(80), nullable=False)
