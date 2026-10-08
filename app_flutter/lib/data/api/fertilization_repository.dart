@@ -10,7 +10,7 @@ class FertilizationRepository {
   Future<FertilizationRecommendation?> getLatestPlan(String parcelId) async {
     final response = await _client.get(
       '/fertilization/plans/latest',
-      query: {'parcel_id': parcelId},
+      query: {'parcel_id': parcelId, 'include_organic': 'true'},
     );
     if (response == null) return null;
     return FertilizationRecommendation.fromJson(
@@ -28,6 +28,7 @@ class FertilizationRepository {
     final body = <String, dynamic>{
       'parcel_id': parcelId,
       'lab_analysis_id': labAnalysisId,
+      'include_organic': true,
       'target_yield': targetYield,
       'yield_unit': yieldUnit,
       'fruit_stage': fruitStage,
@@ -64,6 +65,7 @@ class FertilizationRepository {
     final body = <String, dynamic>{
       'parcel_id': parcelId,
       'reading_id': readingId,
+      'include_organic': true,
       'target_yield': targetYield,
       'yield_unit': yieldUnit,
       'fruit_stage': fruitStage,
