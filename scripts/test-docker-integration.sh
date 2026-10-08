@@ -35,6 +35,21 @@ cleanup() {
   exit "$result"
 }
 trap cleanup EXIT
+capture_bindings() {
+  local phase="$1" item
+  local containers=()
+  while IFS= read -r item; do [[ -z "$item" ]] || containers+=("$item"); done < <(
+    docker ps --filter "label=com.supabase.cli.project=$test_id" --format '{{.Names}}')
+  item="$(docker compose -p "$test_id" ps -q api)"
+  [[ -n "$item" ]] || { printf 'FAIL: API container is missing.\n' >&2; return 1; }
+  containers+=("$item")
+  docker inspect --format '{"name":{{json .Name}},"image":{{json .Image}},"requested":{{json .HostConfig.PortBindings}},"actual":{{json .NetworkSettings.Ports}}}' \
+    "${containers[@]}" > "$AGRIFOS_ENV_DIR/bindings-$phase.jsonl"
+  docker run --rm --network none --user "${AGRIFOS_UID:-1000}:${AGRIFOS_GID:-1000}" \
+    --mount "type=bind,source=$(native_path "$AGRIFOS_SUPABASE_WORKDIR"),target=/evidence,readonly" \
+    --mount "type=bind,source=$(native_path "$repo_root/docker/audit_bindings.py"),target=/audit.py,readonly" \
+    agrifos-backend:test python /audit.py "/evidence/bindings-$phase.jsonl" "$test_id"
+}
 bash scripts/supabase-local.sh start
 for inherited_variable in ${!SUPABASE_@}; do unset "$inherited_variable"; done
 export SUPABASE_TELEMETRY_DISABLED=1
@@ -45,13 +60,21 @@ export SUPABASE_ENV=development
   --mount "type=bind,source=$(native_path "$repo_root/docker/configure.py"),target=/configure.py,readonly" \
   agrifos-backend:test python /configure.py --project "$test_id" --port 54331 --api-port 8010 --integration
 docker compose -p "$test_id" up -d --wait --wait-timeout 180 api
+capture_bindings initial
 docker compose -p "$test_id" run --rm --no-deps integration python /checks/integration.py initial
 docker compose -p "$test_id" exec -T api alembic current
+migration_check_status=0
+docker compose -p "$test_id" exec -T api alembic check || migration_check_status=$?
 docker compose -p "$test_id" stop api migrate
 bash scripts/supabase-local.sh stop
 bash scripts/supabase-local.sh start
 docker compose -p "$test_id" run --rm --no-deps migrate
 docker compose -p "$test_id" up -d --wait --wait-timeout 180 api
+capture_bindings persistence
 docker compose -p "$test_id" run --rm --no-deps integration python /checks/integration.py persistence
 docker compose -p "$test_id" run --rm --no-deps integration python /checks/integration.py cleanup
+if (( migration_check_status != 0 )); then
+  printf 'FAIL: Alembic metadata drift check (exit %s); other integration stages above completed.\n' "$migration_check_status" >&2
+  exit "$migration_check_status"
+fi
 printf 'PASS: isolated real Auth, migrations and persistence. Volumes retained; no reset/prune was run.\n'
