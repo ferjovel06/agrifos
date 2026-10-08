@@ -266,9 +266,21 @@ agrifos/
 
 ## Scripts
 
+### Entorno local con Docker
+
+La guía de incorporación y los comandos para backend, Supabase local y Flutter/Android
+están en [docs/docker.md](docs/docker.md). Docker requiere un daemon Linux operativo;
+Supabase CLI se instala localmente con una versión fijada. Consulta el
+[registro de validación](docs/docker-validation.md) antes de considerar el entorno verificado.
+El estado actual es parcial: Supabase está bloqueado por el binding de puertos en el
+Docker Desktop probado; APK y pruebas de integración siguen pendientes.
+
 ### Backend
 
 ```bash
+# Desde la raíz del repositorio
+cd backend
+
 # Instalar dependencias
 uv sync --locked
 
@@ -279,7 +291,7 @@ uv run alembic upgrade head
 uv run fastapi dev app/main.py
 
 # Ejecutar pruebas
-uv run --with pytest pytest -v
+bash ../scripts/test-backend.sh
 
 # Crear una nueva migración
 uv run alembic revision --autogenerate -m "descripcion_del_cambio"
