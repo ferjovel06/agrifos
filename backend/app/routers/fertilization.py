@@ -33,9 +33,27 @@ from app.services.fertilization_fingerprint import (
     build_fertilization_input_fingerprint,
 )
 from app.services.agronomic_config import IncompleteAgronomicConfigError
+from app.services.organic_fertilization import organic_fingerprint_context
 
 
 router = APIRouter(prefix="/fertilization", tags=["fertilization"])
+
+
+def _client_recommendation(recommendation, include_organic: bool):
+    if include_organic:
+        return recommendation
+    return recommendation.model_copy(update={
+        "fertilizer_scenarios": [s for s in recommendation.fertilizer_scenarios
+                                 if s.organic is None],
+    })
+
+
+def _fingerprint_request(payload):
+    data = payload.model_dump(mode="json")
+    # Preserve the original request hash when the new capability is absent.
+    if not payload.include_organic:
+        data.pop("include_organic", None)
+    return data
 
 
 def _age_in_months(planting_date: date, today: date) -> int:
@@ -81,6 +99,7 @@ def _lab_analysis_fingerprint_data(analysis) -> dict:
 )
 async def get_latest_plan(
     parcel_id: uuid.UUID,
+    include_organic: bool = False,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -104,8 +123,9 @@ async def get_latest_plan(
     )
     if plan is None:
         return None
-    recommendation = FertilizationRecommendationRead.model_validate(
-        plan.recommendation_snapshot
+    recommendation = _client_recommendation(
+        FertilizationRecommendationRead.model_validate(plan.recommendation_snapshot),
+        include_organic,
     )
     source_recorded_at = None
     if getattr(plan, "reading_id", None) is not None:
@@ -229,8 +249,10 @@ async def create_recommendation(
                     "area_hectares": parcel.area_hectares,
                     "plants_per_hectare": parcel.plants_per_hectare,
                 },
-                "request": resolved_payload.model_dump(mode="json"),
+                "request": _fingerprint_request(resolved_payload),
                 "source_data": source_data,
+                **({"organic_context": organic_fingerprint_context()}
+                   if payload.include_organic else {}),
             }
         )
         existing_plan = (
@@ -245,8 +267,9 @@ async def create_recommendation(
                 raise RuntimeError(
                     "A fingerprinted fertilization plan has no recommendation snapshot."
                 )
-            cached = FertilizationRecommendationRead.model_validate(
-                existing_plan.recommendation_snapshot
+            cached = _client_recommendation(
+                FertilizationRecommendationRead.model_validate(existing_plan.recommendation_snapshot),
+                payload.include_organic,
             )
             return cached.model_copy(
                 update={
@@ -275,8 +298,9 @@ async def create_recommendation(
             reading_id=payload.reading_id,
             lab_analysis_id=payload.lab_analysis_id,
         )
-        persisted = FertilizationRecommendationRead.model_validate(
-            plan.recommendation_snapshot
+        persisted = _client_recommendation(
+            FertilizationRecommendationRead.model_validate(plan.recommendation_snapshot),
+            payload.include_organic,
         )
         return persisted.model_copy(
             update={

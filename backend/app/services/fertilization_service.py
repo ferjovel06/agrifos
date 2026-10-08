@@ -1,6 +1,8 @@
 import math
 import uuid
 
+from app.services.organic_fertilization import build_organic_scenario
+
 from app.models import LabAnalysis
 from app.schemas.fertilization import (
     ApplicationRead,
@@ -618,6 +620,13 @@ def calculate_fertilization_recommendation(
                 plants_per_hectare=plants_per_hectare,
             )
         )
+
+    if request.include_organic:
+        scenarios.append(build_organic_scenario(
+            requirements,
+            hectares_per_manzana=config.parameters["hectares_per_manzana"],
+            plants_per_hectare=plants_per_hectare,
+        ))
 
     warnings = [
         "Recomendación de apoyo a decisiones basada en parámetros regionales transferidos.",
