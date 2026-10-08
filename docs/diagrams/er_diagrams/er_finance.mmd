@@ -1,32 +1,38 @@
 erDiagram
-  FARM ||--o{ EXPENSE : incurs
-  FARM ||--o{ INCOME : receives
-  FARM ||--o{ PRODUCTION : yields
-  INCOME o|--o{ PRODUCTION : aggregates
-
-  FARM {
-    uuid id PK
-    uuid user_id FK
-    string name
-  }
-  EXPENSE {
-    uuid id PK
-    uuid farm_id FK
-    string category
-    float amount
-    date expense_date
-  }
-  INCOME {
-    uuid id PK
-    uuid farm_id FK
-    float amount
-    date income_date
-  }
-  PRODUCTION {
-    uuid id PK
-    uuid farm_id FK
-    uuid income_id FK
-    float quantity
-    string unit
-    date harvest_date
-  }
+    %% SQLAlchemy models at main f986ccb; 2026-10-08.
+    FARM ||--o{ EXPENSE : farm_id
+    FARM ||--o{ INCOME : farm_id
+    FARM ||--o{ PRODUCTION : farm_id
+    INCOME o|--o{ PRODUCTION : income_id
+    FARM {
+        uuid user_id FK
+        string name
+        float area_hectares
+        float latitude
+        float longitude
+        uuid id PK
+        datetime created_at
+        datetime updated_at
+    }
+    EXPENSE {
+        uuid farm_id FK
+        string category
+        decimal amount
+        date expense_date
+        uuid id PK
+    }
+    INCOME {
+        uuid farm_id FK
+        string category
+        decimal amount
+        date income_date
+        uuid id PK
+    }
+    PRODUCTION {
+        uuid farm_id FK
+        uuid income_id FK "nullable"
+        float quantity
+        string unit
+        date harvest_date
+        uuid id PK
+    }

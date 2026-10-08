@@ -1,261 +1,79 @@
-# Fundamentos Matemáticos y Algorítmicos del Motor de Cálculo Agrifos para Fertilización de Precisión en Cultivos de Café y Maíz
+# Motor de fertilización de Ágrifos: contrato y cálculo implementados
 
-**Abstract**— El presente documento técnico establece los fundamentos matemáticos y edafológicos del motor de cálculo para un sistema Agrifos de precisión. Se detalla la metodología para cuantificar los requerimientos nutricionales de macroelementos (N, P, K) en los cultivos de café (*Coffea arabica*) y maíz (*Zea mays L.*), en función de su etapa fenológica y variedad. Además, se definen los algoritmos para la interpretación de análisis de suelos provenientes tanto de laboratorios convencionales como de sensores electrónicos in situ (7 en 1). Finalmente, se exponen los algoritmos para la recomendación de fertilizantes sintéticos y enmiendas orgánicas, integrando factores de eficiencia de asimilación y un modelo de riesgo climático que mitiga las pérdidas por lixiviación y escorrentía superficial.
+Revisión: 8 de octubre de 2026. Base: `main`, `f986ccb`, PR #74. Motor mineral: `coffee-fertilization-1.0.1`.
 
-**Términos Clave**— Agricultura de Precisión, Algoritmos de Recomendación, Sensores NPK, Fenología, Edafología Computacional.
+## Alcance y fuentes de verdad
 
----
+El motor implementado está orientado a café. Su arquitectura es escalable; otros cultivos requieren trabajo de desarrollo y validación. Esta documentación describe el código integrado, no las propuestas anteriores sobre maíz, calibración automática, cohortes o dosificación complementaria.
 
-## I. Introducción
+Consultar `backend/app/services/fertilization_service.py`, `agronomic_config.py`, `organic_fertilization.py`, `backend/app/schemas/fertilization.py`, el router y el repositorio de planes. Las referencias minerales se cargan de PostgreSQL mediante `repositories/agronomic_reference.py`: productos, rangos, factores, eficiencias y calendario pertenecen a un conjunto versionado. Una configuración incompleta se rechaza.
 
-La transición hacia una agricultura de precisión exige la digitalización y automatización de los procesos de toma de decisiones agronómicas. Históricamente, las recomendaciones de fertilización han dependido de tablas estáticas o interpretaciones manuales. El motor de cálculo descrito en este documento integra variables edafoclimáticas en tiempo real y parámetros fisiológicos del cultivo para emitir recomendaciones dinámicas. El objetivo central es optimizar la nutrición de los cultivos de café (variedades Caturra, Borbón, Catuaí) y maíz (Híbrido, Mejorada, Criollo), maximizando el rendimiento mientras se minimiza el impacto ambiental y el costo económico de los insumos.
+## Entradas y unidades
 
-## II. Metodología Matemática
+La petición identifica parcela, rendimiento, unidad y etapa del fruto. Debe proporcionar exactamente una evaluación `soil` o un `lab_analysis_id`. `reading_id` solo acompaña una evaluación de sensor y debe pertenecer a la parcela. El servidor obtiene cultivo, variedad, edad, superficie y densidad de la parcela y verifica autorización.
 
-El núcleo del motor de cálculo se basa en la ecuación fundamental de balance de masa nutricional. Para cada macronutriente $i \in \{N, P, K\}$, el déficit se calcula determinando la demanda del cultivo y restando la fracción asimilable disponible en el suelo.
+Rendimientos admitidos: `kg_green_ha`, `qq_gold_ha`, `qq_cherry_ha`. Oro se convierte con `kg_per_qq_gold`; cereza usa además `cherry_to_green_factor`. Estos factores pertenecen a la configuración activa. Nunca interpretar un rendimiento por finca como rendimiento por hectárea.
 
-### Paso A: Demanda Nutricional del Cultivo ($D_c$)
+`soil` contiene estados N/P/K: `deficient`, `probable_response`, `adequate`, `high`; pH y CE son opcionales. Laboratorio y fuente mixta requieren los métodos de P y K. El análisis persistido se clasifica con los rangos activos. Exigir un método no significa que el motor implemente una conversión universal entre extractantes.
 
-La demanda nutricional ($D_c$) en kg/ha se define como la cantidad total de un nutriente que el cultivo debe absorber para alcanzar un rendimiento objetivo en una fase fenológica específica. Se calcula mediante:
+El sensor es una fuente orientativa: no se implementa una curva automática de calibración NPK según temperatura/humedad ni una conversión de toda la masa de suelo a disponibilidad nutricional. Ca/Mg/S capturados en laboratorio no forman parte del balance productivo actual; B/Zn y otros micronutrientes tampoco tienen una dosificación integrada.
 
-$$D_{c(i)} = R_{obj} \times I_{e(i)} \times f_{v(i)} \times f_{e(i)}$$
+## Balance productivo
 
-Donde:
-*   $R_{obj}$: Rendimiento objetivo esperado (ej. ton/ha o qq/ha).
-*   $I_{e(i)}$: Índice de extracción base del nutriente $i$ (kg de nutriente por unidad de rendimiento).
-*   $f_{v(i)}$: Factor de corrección por variedad.
-*   $f_{e(i)}$: Factor de fase fenológica (distribución de la demanda según la edad del cultivo).
+Para cada nutriente i en N, P₂O₅ y K₂O:
 
-**Tabla I: Valores de Extracción Base (kg/ha) y Factores de Variedad (Estimaciones de Referencia)**
-
-| Cultivo | Nutriente ($i$) | Extracción Anual Base (Producción Alta) | Var. Café ($f_v$) | Var. Maíz ($f_v$) |
-| :--- | :---: | :---: | :--- | :--- |
-| **Café** | Nitrógeno (N) | 120 - 150 kg/ha | Caturra: 1.05 | - |
-| | Fósforo ($P_2O_5$) | 20 - 30 kg/ha | Borbón: 0.95 | - |
-| | Potasio ($K_2O$) | 130 - 160 kg/ha | Catuaí: 1.10 | - |
-| **Maíz** | Nitrógeno (N) | 150 - 200 kg/ha | - | Híbrido: 1.20 |
-| | Fósforo ($P_2O_5$) | 40 - 60 kg/ha | - | Mejorada: 1.00 |
-| | Potasio ($K_2O$) | 110 - 140 kg/ha | - | Criollo: 0.80 |
-
-### Paso B: Aporte Nutricional del Suelo ($S_a$)
-
-El motor de cálculo procesa datos de entrada de dos fuentes distintas para determinar la disponibilidad actual del suelo.
-
-#### 1. Análisis de Laboratorio Tradicional
-
-Los resultados de laboratorio reportan concentraciones que deben extrapolarse a la masa total de la capa arable por hectárea.
-
-La masa del suelo por hectárea ($M_s$) en kg se calcula como:
-$$M_s = A \times P_r \times D_a \times 1000$$
-Donde $A = 10,000 \text{ m}^2$, $P_r$ es la profundidad de raíces (m), y $D_a$ es la densidad aparente ($\text{g/cm}^3 \equiv \text{ton/m}^3$).
-
-**Conversión de ppm (mg/kg) a kg/ha (para N-NO3, N-NH4, P):**
-$$S_{a(ppm)} \text{ (kg/ha)} = C_{ppm} \times \frac{M_s}{10^6} \times F_{ox}$$
-*Nota: Para P y K, se requiere el factor de conversión a óxidos ($F_{ox}$): P a $P_2O_5 = 2.291$; K a $K_2O = 1.205$.*
-
-**Conversión de meq/100g o cmol(+)/kg a kg/ha (para K):**
-Para el potasio (K), donde el peso atómico es $39.1 \text{ g/mol}$:
-$$S_{a(cmol)} \text{ (kg/ha)} = C_{cmol} \times 391 \times \frac{M_s}{10^6} \times 1.205$$
-
-#### 2. Sensores Electrónicos de Suelo (7 en 1)
-
-Los sensores 7 en 1 proporcionan lecturas de Humedad (%), Temperatura (°C), pH, Conductividad Eléctrica CE (dS/m), y concentraciones estimadas de N, P, K en mg/kg.
-Los sensores capacitivos/resistivos de bajo costo miden fundamentalmente la impedancia iónica global, y mediante microcontroladores infieren el NPK. El motor de cálculo aplica una curva de calibración ($g(x)$) que ajusta estas lecturas en función del contenido volumétrico de agua ($\theta$) y la temperatura ($T$):
-
-$$C_{ajustada(i)} = g(Lectura_{sensor(i)}, \theta, T, pH)$$
-
-Por ejemplo, la corrección térmica para la CE que afecta la lectura de nitratos:
-$$CE_{25} = \frac{CE_T}{1 + 0.02(T - 25)}$$
-Una vez calibrado a $C_{ajustada(ppm)}$, se utiliza la ecuación de laboratorio para convertir a kg/ha.
-
-### Paso C: Cálculo de Déficit y Eficiencia ($D_f$)
-
-La cantidad real de nutriente a aplicar ($D_f$) incorpora la ineficiencia intrínseca de los fertilizantes en el agroecosistema.
-
-$$D_{f(i)} = \frac{D_{c(i)} - S_{a(i)}}{E_{f(i)}}$$
-
-**Factores de Eficiencia ($E_f$) Típicos:**
-*   **Nitrógeno ($E_{f(N)}$): $0.40 - 0.60$.** Afectado severamente por volatilización de amoníaco, lixiviación de nitratos y desnitrificación.
-*   **Fósforo ($E_{f(P)}$): $0.15 - 0.30$.** Baja movilidad y alta fijación en suelos volcánicos (Andisoles) comunes en zonas cafetaleras o calcáreos.
-*   **Potasio ($E_{f(K)}$): $0.60 - 0.70$.** Pérdidas moderadas por lixiviación en suelos arenosos.
-
-## III. Algoritmo de Recomendación (Outputs)
-
-### A. Recomendación de Fertilización Convencional (Química)
-
-El motor prioriza el cálculo en orden inverso a la complejidad de las fuentes, comenzando por las binarias (como el DAP - Fosfato Diamónico) para ajustar las simples (como la Urea).
-
-Dadas las leyes de fertilizantes: Urea (46% N), DAP (18% N, 46% $P_2O_5$), KCl (60% $K_2O$).
-
-**1. Cálculo de DAP:**
-$$DAP_{kg/ha} = \frac{D_{f(P)}}{0.46}$$
-
-**2. Descuento de Nitrógeno aportado por DAP y Cálculo de Urea:**
-$$N_{aportado} = DAP_{kg/ha} \times 0.18$$
-$$Urea_{kg/ha} = \frac{\max(0, D_{f(N)} - N_{aportado})}{0.46}$$
-
-**3. Cálculo de Cloruro de Potasio (KCl):**
-$$KCl_{kg/ha} = \frac{D_{f(K)}}{0.60}$$
-
-**4. Conversión a Unidad Operativa (Onzas por Planta):**
-Para llevar la recomendación a la escala de aplicación del operario, se utiliza la densidad de siembra ($\rho_p$ en plantas/ha). Sabiendo que $1 \text{ kg} = 1000 \text{ g}$ y $1 \text{ onza} = 28.3495 \text{ g}$:
-
-$$Dosis_{planta} \text{ (oz)} = \left( \frac{Dosis_{ha} \times 1000}{\rho_p} \right) \times \frac{1}{28.3495}$$
-
-*(Ejemplo: Si $\rho_p$ para café es 5,000 plantas/ha, y se requieren 100 kg Urea/ha $\rightarrow$ 20 g/planta $\approx$ 0.7 oz/planta).*
-
-### B. Recomendación de Fertilización Orgánica
-
-La fertilización orgánica se calcula sustituyendo el requerimiento de $D_f$ con la matriz de composición de enmiendas orgánicas, ponderadas por su Tasa de Mineralización Anual ($M_{t(i)}$).
-
-Sea un abono orgánico con concentraciones fraccionales $C_N, C_P, C_K$:
-
-$$Dosis_{org} \text{ (kg/ha)} = \max \left( \frac{D_{f(N)}}{C_N \cdot M_{t(N)}}, \frac{D_{f(P)}}{C_P \cdot M_{t(P)}}, \frac{D_{f(K)}}{C_K \cdot M_{t(K)}} \right)$$
-
-*Valores de Referencia:*
-*   **Bocashi:** N (1.5-2.5%), P (1-2%), K (1-2%). $M_t \approx 0.60$ en el primer año.
-*   **Humus de Lombriz:** N (1-2%), P (1-1.5%), K (1-1.5%). $M_t \approx 0.70$.
-*   **Roca Fosfórica:** $P_2O_5$ (20-30%). $M_t \approx 0.10 - 0.20$ (liberación muy lenta, dependiente de pH ácido).
-
-*Nota Algorítmica:* El sistema calcula la limitante mayor (usualmente el N) y completa los déficits de P y K con fuentes minerales permitidas (ej. Sulfato de Potasio natural) si no se desea sobreaplicar el compuesto orgánico.
-
-## IV. Interacción Climática y Fenológica: Alertas de Programación
-
-El motor incorpora una matriz de riesgo probabilístico $R(t)$ basada en el pronóstico meteorológico a $t \in [24, 48]$ horas. La pérdida de nitrógeno soluble (ej. Urea granulada sintética sin incorporación) por escorrentía superficial o lixiviación profunda incrementa exponencialmente si las precipitaciones $P_r(t)$ exceden la tasa de infiltración del suelo $I_s$.
-
-**Algoritmo de Alerta:**
-```math
-R(t) = 
-\begin{cases} 
-0, & \text{si } P_r(t) \le 10 \text{ mm} \\
-\frac{P_r(t) - 10}{40}, & \text{si } 10 < P_r(t) \le 50 \text{ mm} \\
-1 (Riesgo Crítico), & \text{si } P_r(t) > 50 \text{ mm}
-\end{cases}
-```
-Si $R(t) > 0.6$ en un lapso de 48 horas post-aplicación, el motor emite una alerta bloqueando la recomendación de aplicación de fertilizantes de alta solubilidad, estimando una tasa de pérdida monetaria del $R(t) \times 0.50$ (50% de pérdida potencial del fertilizante aplicado).
-
-## V. Discusión y Conclusión
-
-El algoritmo desarrollado encapsula la complejidad de las interacciones suelo-planta-atmósfera en fórmulas determinísticas que son computacionalmente eficientes. La integración de calibraciones para sensores de bajo costo permite la democratización de la agricultura de precisión, superando la latencia de los análisis de laboratorio convencionales. El motor no solo calcula las dosis exactas en métricas utilizables en campo (onzas/planta), sino que promueve la sostenibilidad mediante la integración de alternativas orgánicas y el bloqueo de aplicaciones preventivas ante riesgos climáticos.
-
-## VI. Referencias
-
-[1] FAO. (2000). *Fertilizers and their use: A pocket guide for extension officers* (4th ed.). Food and Agriculture Organization of the United Nations.
-[2] Benton, J. S. (2012). *Plant nutrition and soil fertility manual* (2nd ed.). CRC Press.
-[3] Cenicafé. (2013). *Manual del cafetero colombiano: Investigación y tecnología para la sostenibilidad de la caficultura* (Vol. 2). Centro Nacional de Investigaciones de Café.
-[4] CIMMYT. (2015). *Maize production in the tropics and subtropics*. International Maize and Wheat Improvement Center.
-[5] Moraga, J. (2024). *Guía técnica para el manejo del café en fincas del centro-norte de Nicaragua* [Publicación técnica regional].
-[6] Sadeghian, S. (2009). *Fertilidad del suelo y nutrición del café en Colombia: Guía práctica*. Cenicafé.
-[7] Sadeghian, S. (2018). Interpretación del análisis de suelos para el cultivo de café. *Cenicafé, Avances Técnicos*, (494).
-[8] Sadeghian, S. (2020). Actualización de niveles críticos de nutrientes para café. Cenicafé.
-[9] Salazar-Gutiérrez, M. R., Chaves-Córdoba, B., & Arcila-Pulgarín, J. (1993). Desarrollo del fruto del café. *Cenicafé*, *44*(1), 33–44.
-[10] World Coffee Research. (s. f.). *Variety catalog — Caturra, Bourbon, Catuaí*. https://varieties.worldcoffeeresearch.org
-
----
-
-## VII. Catálogo Extendido de Fertilizantes
-
-*Ver documento completo: [`coffee_phenology_and_fertilization_engine.pdf`](./coffee_phenology_and_fertilization_engine.pdf), Sección 11.*
-
-El motor original usa Urea, DAP y KCl como fuentes estándar. La especificación extendida añade las siguientes fuentes para cubrir déficits específicos de S, Ca, Mg y escenarios donde se debe evitar el cloro o el nitrógeno adicional.
-
-### VII.A Fertilizantes químicos adicionales
-
-| Fertilizante | N% | P₂O₅% | K₂O% | S% | Ca% | Mg% | Caso de uso principal |
-|---|---|---|---|---|---|---|---|
-| MAP | 11 | 52 | — | — | — | — | Cobertura alta de P con menor N que DAP |
-| TSP | — | 46 | — | — | ≈12 | — | Solo P + Ca; sin N |
-| Sulfato de potasio (K₂SO₄) | — | — | 50 | 18 | — | — | K en suelos clorosensibles o con déficit de S |
-| Nitrato de potasio (KNO₃) | 13 | — | 46 | — | — | — | K + N sin fósforo |
-| Sulfato de amonio | 21 | — | — | 24 | — | — | N + S; acidificante útil en pH alto |
-| Nitrato de calcio | 15.5 | — | — | — | 19 | — | N + Ca; no acidifica |
-| Kieserita (MgSO₄·H₂O) | — | — | — | 20 | — | 15 | Déficit de Mg y S |
-| Yeso agrícola (CaSO₄·2H₂O) | — | — | — | 16 | 20 | — | Ca + S sin alterar pH |
-| Cal dolomítica | — | — | — | — | Variable | Variable | Encalado; usar composición y PRNT certificados |
-
-### VII.B Orden de cálculo ampliado (cascada de 5 pasos)
-
-```
-1. Si pH < 5.0  → calcular cal dolomítica y bloquear N-P-K
-2. D_f(P):       usar DAP o MAP según relación N:P requerida
-3. D_f(N):       descontar N de DAP/MAP; completar con Urea o (NH₄)₂SO₄
-4. D_f(K):       elegir KCl (estándar) o K₂SO₄ (clorosensible / def. S)
-5. D_f(Mg/S):    aplicar kieserita si Mg < 73 mg/kg o S < 5 mg/kg
+```text
+exportación_i = rendimiento_verde_kg_ha / 1000 × índice_extracción_i
+demanda_i = exportación_i × (1 + mantenimiento) × factor_varietal_i
+crédito_i = exportación_i × crédito_configurado_para_estado_i
+requerimiento_i = max(0, demanda_i − crédito_i) / eficiencia_i
+si estado_i == high: requerimiento_i = 0
 ```
 
----
+El crédito es una aproximación por clase de fertilidad. No es una medición de kg disponibles derivada de ppm, profundidad o densidad aparente. Los resultados muestran exportación, demanda, crédito y requerimiento separados; los valores se redondean para el contrato. La eficiencia se aplica una vez al requerimiento mineral.
 
-## VIII. Modelo Fenológico del Café
+## Escenarios minerales y cantidades
 
-*Ver documento completo: [`coffee_phenology_and_fertilization_engine.pdf`](./coffee_phenology_and_fertilization_engine.pdf).*
+Económico y Bajo cloruro emplean productos del catálogo activo. La selección considera fuentes fosfatadas (DAP/MAP/TSP), su aporte concomitante de N, la fuente potásica y la urea restante. Se deben consultar las condiciones exactas del servicio; no es una optimización comercial basada en precios. El catálogo obligatorio incluye Urea, DAP, MAP, TSP, KCl, sulfato de potasio y MgO. La presencia de MgO en el plan de café joven no constituye un algoritmo general de déficit de Mg productivo.
 
-### VIII.A Ciclo de vida del cafeto (etapas por edad en meses)
+```text
+kg/manzana = kg/ha × hectáreas_por_manzana
+g/planta = kg/ha × 1000 / plantas_por_hectárea
+cantidad_parcela_kg = kg/ha × superficie_ha
+```
 
-| Etapa | Edad aproximada | Regla del motor |
-|---|---|---|
-| Vivero inicial | 0–3 meses | No emitir dosis productiva |
-| Vivero avanzado | 4–8 meses | Nutrientes fraccionados; evitar sobredosis |
-| Establecimiento | 9–12 meses | Priorizar humedad y P de arranque |
-| Levante | 13–24 meses | Plan de N; incrementar K y Mg con edad |
-| Transición a producción | 25–36 meses | Separar demanda vegetativa y de fruto |
-| Producción inicial | 37–48 meses | Usar rendimiento objetivo y carga observada |
-| Producción estable | >48 meses | Balance anual; extracción por cosecha |
+N, P₂O₅ y K₂O son nutrientes, no kg de fertilizante. No mezclar P elemental con P₂O₅, ni K elemental con K₂O. El análisis garantizado del producto determina sus aportes. Las dosis y aplicaciones se distribuyen con reglas configuradas; el servicio puede subdividir según el máximo de N por aplicación.
 
-### VIII.B Fenología reproductiva (estados del fruto)
+## Edad y restricciones
 
-| Estado | Días desde floración (DAF) | Fracción de demanda N / P / K |
-|---|---|---|
-| Prefloración | <0 | Preparación; nutrición equilibrada |
-| Floración | 0–7 | Crear cohorte; iniciar contador DAF |
-| Cuajado | 8–56 | 15% / 25% / 10% |
-| Expansión rápida | 57–120 | 35% / 30% / 35% |
-| Llenado y endurecimiento | 121–182 | 30% / 25% / 35% |
-| Maduración fisiológica | 183–224 | 20% / 20% / 20% |
-| Ventana tardía (altitud) | 225–252 | Mantener monitoreo |
+Etapas por edad: vivero hasta 8 meses, establecimiento hasta 12, levante hasta 24, producción inicial hasta 48 y estable después. Hasta 3 meses no se emite dosis de campo. De 4 a 24 meses se usa el plan general acumulado de café joven, con cinco momentos de referencia (meses 2, 6, 10, 14 y 18); no repetir aplicaciones ya realizadas. Producción usa cuatro reglas de calendario de configuración.
 
-### VIII.C Ajuste por altitud
+Se validan superficie/densidad positivas, variedad registrada con factores y coincidencia del cultivo del conjunto activo. La CE puede impedir un plan automático conforme al umbral configurado. Las demás advertencias y condiciones deben conservarse en la interfaz; no convertir apoyo a decisiones en una garantía de rendimiento.
 
-| Altitud | Duración floración–madurez |
-|---|---|
-| <1,200 m | 196–210 días (ventana rápida) |
-| 1,200–1,700 m | ≈224 días (ventana base) |
-| >1,700 m | 238–252 días (ventana lenta) |
+## Evaluación orgánica optativa
 
-### VIII.D Regla de bloqueo por cohortes
+`include_organic` es `false` por defecto; Flutter lo activa. El escenario compara Bocashi, Biol y Compost de pulpa de café con el objetivo mineral, sin volver a dividirlo por eficiencia. Los sólidos se corrigen por humedad y composición en base seca; P y K elementales se convierten a óxidos. El biol usa concentraciones por litro, sin densidad ficticia.
 
-Una parcela puede tener múltiples cohortes activas simultáneamente (varias fechas de floración). El motor debe calcular la etapa de cada cohorte por separado y **nunca almacenar una única etapa** para toda la parcela.
+Se fija un volumen ilustrativo limitado de biol y se evalúan combinaciones de los dos sólidos con cantidades no negativas y aportes totales acotados por los objetivos de comparación. Se maximiza cobertura relativa y se recalcula el balance con cantidades finales redondeadas hacia abajo. Composición total no equivale a absorción en el ciclo: no se aplica una tasa universal de mineralización.
 
----
+El escenario orgánico se añade en la rama productiva (más de 24 meses), cuando se solicita; no se añade al retorno de vivero o café joven. Económico y Bajo cloruro no siempre aparecen juntos: CE elevada prioriza solo Bajo cloruro, y la alternativa potásica depende de que haya requerimiento de K₂O.
 
-## IX. Rangos de Referencia para Análisis de Laboratorio (Café)
+Los estados `partial` y `reference_only` conservan `can_apply: false`; no generan calendario ejecutable. El contrato impide promoverlos como una aplicación mineral. No implica certificación orgánica. Perfiles, fuentes, ejemplo numérico y pruebas se detallan en [IMPLEMENTACION_ORGANICA_LOCAL.md](IMPLEMENTACION_ORGANICA_LOCAL.md).
 
-*Ver documento completo con metadatos y guía de implementación: [`coffee_soil_laboratory_parameters.pdf`](./coffee_soil_laboratory_parameters.pdf).*
+## Persistencia y compatibilidad
 
-### IX.A Macronutrientes y parámetros principales
+`FertilizationPlan` guarda el snapshot JSON y la versión del motor; `FertilizationPlanItem` mantiene cantidades normalizadas de productos minerales. Los candidatos orgánicos permanecen en JSON, con unidades nativas. No se crearon tablas ni migraciones para esta capacidad.
 
-| Parámetro | Unidad | Bajo | Adecuado | Alto | Confianza |
-|---|---|---|---|---|---|
-| pH | SU | <5.0 | 5.0–5.5 | >5.5 (revisar especialmente >6.0) | Alta |
-| Conductividad eléctrica | dS/m | <0.10 (baja, no deficiencia nutricional) | 0.10–0.80 | >0.80 (vigilancia); ≥1.10 (riesgo) | Media |
-| Materia orgánica | % | <8 | 8–16 | >16 | Alta |
-| Nitrógeno total | mg/kg | <3,400 | 3,400–5,800 | >5,800 | Alta |
-| Fósforo disponible | mg/kg | <10 | 10–20 | >20 | Alta |
-| Calcio intercambiable | mg/kg | <301 | 301–601 | >601 | Alta |
-| Magnesio intercambiable | mg/kg | <73 | 73–109 | >109 | Alta |
-| Potasio intercambiable | mg/kg | <78 | 78–156 | >156 | Alta |
-| Azufre disponible | mg/kg | <6 | 6–12 | >12 | Media-baja |
-| CIC | cmol(+)/kg | <15 | 15–25 | >25 (generalmente favorable) | Alta |
-| Saturación de bases | % | <20 | >30 | Revisar >80 y desequilibrios | Alta |
+Las huellas deterministas permiten recuperar planes equivalentes. Sin Orgánico se preserva la forma antigua de la petición para la huella; con Orgánico se incorpora contexto de perfiles/modelo/política. El router filtra la capacidad también en recuperación y caché. Plan guardado no significa aplicación realizada, gasto contabilizado ni tarea fenológica creada.
 
-### IX.B Micronutrientes (extracción DTPA / agua caliente)
+## Clima y fenología
 
-| Nutriente | Bajo | Adecuado | Alto | Método |
-|---|---|---|---|---|
-| Zinc (Zn) | <1.5 mg/kg | 1.5–3.0 mg/kg | >3.0 mg/kg | DTPA u Olsen modificado |
-| Hierro (Fe) | <25 mg/kg | 25–50 mg/kg | >50 mg/kg | DTPA u Olsen modificado |
-| Manganeso (Mn) | <5 mg/kg | 5–20 mg/kg | >20 mg/kg | DTPA u Olsen modificado |
-| Cobre (Cu) | <1.0 mg/kg | 1.0–3.0 mg/kg | >3.0 mg/kg | DTPA u Olsen modificado |
-| Boro (B) | <0.2 mg/kg | 0.2–0.5 mg/kg | >0.5 mg/kg | Agua caliente |
+El servicio climático es independiente. Suma precipitación de los primeros dos días: riesgo 0 hasta 10 mm, (lluvia−10)/40 hasta 50 mm, 1 por encima. Riesgo >0.6 genera alerta para posponer; calor genera alertas desde 37 °C, críticas desde 42 °C. La pérdida potencial mostrada (`riesgo × 50%`) es una heurística del código, no una medición económica ni una predicción validada por finca.
 
-> [!IMPORTANT]
-> Los métodos de extracción **no son intercambiables**. Agrifos debe almacenar el método junto a cada resultado y mostrar el umbral correspondiente al método usado. Si el método es desconocido, etiquetar el resultado como "referencia orientativa".
+No existe una matriz de infiltración integrada ni un bloqueo automático del cálculo de fertilización por alerta climática. El calendario presenta pronóstico y alertas; las instancias fenológicas se gestionan por API y selección de etapa, sin un modelo implementado de múltiples cohortes de floración.
+
+## Validación y mantenimiento
+
+Backend: pruebas en `backend/tests/`, ejecutadas desde `backend` con `python -m unittest discover -s tests -v` y variables de entorno de prueba. Flutter: `flutter analyze` y `flutter test` desde `app_flutter`. La demo orgánica usa `backend/tools/generate_organic_demo.py` y `app_flutter/tool/organic_demo.dart`; datos ficticios no sustituyen ensayo de campo ni infraestructura real.
+
+Los PDF agronómicos del repositorio son referencias de diseño. Rangos de otros nutrientes y formulaciones propuestas no pasan a ser funcionalidades por figurar en esos documentos. Cualquier ampliación debe añadir contratos, cálculo, fuentes verificables y validación antes de documentarse como integrada.

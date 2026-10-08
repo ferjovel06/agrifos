@@ -1,6 +1,8 @@
-# Ágrifos: implementación local del escenario Orgánico
+# Ágrifos: implementación del escenario Orgánico
 
 Fecha de implementación: 6 de octubre de 2026. Preparación de entrega: 8 de octubre de 2026. Rama: `feat/organic-fertilization`.
+
+Estado actual: integrado en `main` mediante PR #74, commit `f986ccb`. Los apartados de ubicación y validación siguientes conservan el historial de implementación local; sus rutas D son específicas de ese entorno. No describen una ejecución nueva de pruebas durante esta actualización documental.
 
 ## Base y ubicación
 
@@ -72,7 +74,7 @@ Los mensajes de fallas de salud/clima/autenticación presentes en los registros 
 
 La plataforma web no está configurada en el repositorio actual. Para evitar añadir una plataforma entera a la aplicación, se creó `D:\Agrifos\organic-preview-web` con dependencia local a `app_flutter`. Su `main.dart` usa la pantalla real y los datos de `tool/organic_demo.dart`.
 
-La demo se sirve únicamente en **http://127.0.0.1:8876/**. Se revisó el selector, el resumen y Aplicaciones con un viewport móvil de 390 × 844. Es una emulación visual en navegador, **no una ejecución en un emulador Android ni una prueba de Bluetooth/OTG**.
+En la validación histórica, la demo se sirvió en **http://127.0.0.1:8876/**. Se revisó el selector, el resumen y Aplicaciones con un viewport móvil de 390 × 844. Es una emulación visual en navegador, **no una ejecución en un emulador Android ni una prueba de Bluetooth/OTG**.
 
 No se conectó a Supabase remoto, no se escribieron datos productivos y no se validó un ciclo real contra PostgreSQL. Esas integraciones no se declaran probadas. La demo utiliza parcela e identificadores ficticios y densidad de 5,000 plantas/ha; no afirma que esa densidad sea la de la captura del usuario.
 
@@ -128,11 +130,11 @@ Set-Location D:\Agrifos\organic-preview-web
 
 Registros: `D:\Agrifos\local-organico-runtime\backend-tests.log` y `flutter-tests.log`. Capturas: `D:\Agrifos\local-organico-runtime\capturas`.
 
-## Antes de decidir el commit
+## Estado de entrega y validación pendiente
 
-La implementación local del escenario de evaluación está lista para revisión. Mantiene el resultado parcial visible y las aplicaciones deshabilitadas. Para convertirlo en receta ejecutable faltan lotes analizados, equivalencias/disponibilidad validadas, vías, límites y calendarios aprobados, además de pruebas de integración con la infraestructura elegida.
+El escenario de evaluación está fusionado en main mediante PR #74. Mantiene el resultado parcial visible y las aplicaciones deshabilitadas. Para convertirlo en receta ejecutable faltan lotes analizados, equivalencias/disponibilidad validadas, vías, límites y calendarios aprobados, además de pruebas de integración con la infraestructura elegida.
 
-La validación local previa se realizó sin commit, push, despliegue ni migración de datos. La entrega se organiza en commits separados de backend y frontend.
+La validación local previa se realizó sin commit, push, despliegue ni migración de datos. La entrega se realizó en commits separados: backend `5146aa3` y frontend `915dde8`, posteriormente fusionados por `f986ccb`.
 
 ## Revisión visual y comprobación del bocashi, 6 de octubre
 
@@ -160,4 +162,3 @@ La prueba visual automatizada se ajustó a 390 × 844. Detectó y permitió corr
 ## Actualización de la base y entrega, 8 de octubre
 
 Se integró origin/main hasta a1df7e0 (PR 73, ejecutor local de pruebas del backend) sin conflictos. Tras actualizar, pasaron las 116 pruebas del backend y la compilación web. La validación previa de Flutter pasó 83 pruebas y el análisis estático no informó problemas. La vista local usa datos de ejemplo; no sustituye una prueba de infraestructura real ni valida dosis agronómicas.
-

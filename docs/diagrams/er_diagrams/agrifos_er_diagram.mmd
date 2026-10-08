@@ -1,359 +1,324 @@
----
-config:
-  layout: elk
----
 erDiagram
-  direction TB
-
-  %% Core farm structure
-  USER ||--o{ FARM : owns
-  FARM ||--o{ PARCEL : contains
-  CROP ||--o{ PARCEL : grows_in
-  CROP ||--o{ VARIETY : has
-  VARIETY o|--o{ PARCEL : specifies
-
-  USER {
-    uuid id PK
-    string name
-    string email
-    string role
-    date birth_date
-    string gender
-    string phone
-    string country
-    string department
-    string address
-    datetime created_at
-    datetime updated_at
-  }
-
-  FARM {
-    uuid id PK
-    datetime created_at
-    datetime updated_at
-    uuid user_id FK
-    string name
-    float area_hectares
-    float latitude
-    float longitude
-  }
-
-  PARCEL {
-    uuid id PK
-    datetime created_at
-    datetime updated_at
-    uuid farm_id FK
-    uuid crop_id FK
-    uuid variety_id FK
-    string name
-    float area_hectares
-    int plants_per_hectare
-    Date planting_date
-  }
-
-  CROP {
-    uuid id PK
-    datetime created_at
-    datetime updated_at
-    string name
-  }
-
-  VARIETY {
-    uuid id PK
-    datetime created_at
-    datetime updated_at
-    uuid crop_id FK
-    string name
-  }
-
-  %% Monitoring and analysis
-  PARCEL ||--o{ READING : records
-  PARCEL ||--o{ LAB_ANALYSIS : records
-
-  READING {
-    uuid id PK
-    uuid parcel_id FK
-    float nitrogen
-    float phosphorus
-    float potassium
-    float ec
-    float ph
-    float temperature
-    float humidity
-    datetime recorded_at
-  }
-
-  LAB_ANALYSIS {
-    uuid id PK
-    uuid parcel_id FK
-    string sample_code
-    datetime sampled_at
-    float depth_start_cm
-    float depth_end_cm
-    float ph
-    string ph_method
-    float ec
-    string ec_method
-    float organic_matter_pct
-    float cic
-    float clay_pct
-    float silt_pct
-    float sand_pct
-    float nitrogen
-    float phosphorus
-    string phosphorus_method
-    float potassium
-    string potassium_method
-    float calcium
-    float magnesium
-    float sulfur
-    string lab
-    datetime recorded_at
-  }
-  %% Crop stages and requirements
-  CROP ||--o{ PHENOLOGICAL_STAGE_TEMPLATE : defines
-  PHENOLOGICAL_STAGE_TEMPLATE ||--o{ PARCEL_PHENOLOGICAL_STAGE : instantiates
-  PARCEL ||--o{ PARCEL_PHENOLOGICAL_STAGE : schedules
-
-  CROP ||--o{ OPTIMAL_REQUIREMENT : sets
-  PHENOLOGICAL_STAGE_TEMPLATE ||--o{ OPTIMAL_REQUIREMENT : applies_at
-  CROP ||--o{ EXTRACTION_INDEX : defines
-  VARIETY ||--o{ VARIETY_FACTOR : adjusts
-  PHENOLOGICAL_STAGE_TEMPLATE ||--o{ STAGE_FACTOR : adjusts
-
-  PHENOLOGICAL_STAGE_TEMPLATE {
-    uuid id PK
-    uuid crop_id FK
-    string name
-    int stage_order
-    int duration_days
-  }
-  PARCEL_PHENOLOGICAL_STAGE {
-    uuid id PK
-    uuid parcel_id FK
-    uuid template_id FK
-    date estimated_date
-    date actual_date
-    datetime selected_at
-  }
-
-  OPTIMAL_REQUIREMENT {
-    uuid id PK
-    uuid reference_set_id FK
-    uuid crop_id FK
-    uuid stage_id FK
-    string nutrient
-    float min_value
-    float max_value
-  }
-
-  EXTRACTION_INDEX {
-    uuid id PK
-    uuid reference_set_id FK
-    uuid crop_id FK
-    string nutrient
-    float ie_value
-  }
-
-  VARIETY_FACTOR {
-    uuid id PK
-    uuid reference_set_id FK
-    uuid variety_id FK
-    string nutrient
-    float fv_factor
-  }
-
-  STAGE_FACTOR {
-    uuid id PK
-    uuid reference_set_id FK
-    uuid stage_id FK
-    string nutrient
-    float fe_factor
-  }
-
-  %% Agronomic reference data
-  AGRONOMIC_REFERENCE_SET ||--o{ SOIL_REFERENCE_RANGE : versions
-  AGRONOMIC_REFERENCE_SET ||--o{ FERTILIZER_PRODUCT : versions
-  AGRONOMIC_REFERENCE_SET ||--o{ APPLICATION_SCHEDULE_RULE : versions
-  AGRONOMIC_REFERENCE_SET ||--o{ AGRONOMIC_PARAMETER : versions
-  AGRONOMIC_REFERENCE_SET o|--o{ OPTIMAL_REQUIREMENT : versions
-  AGRONOMIC_REFERENCE_SET o|--o{ EXTRACTION_INDEX : versions
-  AGRONOMIC_REFERENCE_SET o|--o{ VARIETY_FACTOR : versions
-  AGRONOMIC_REFERENCE_SET o|--o{ STAGE_FACTOR : versions
-  AGRONOMIC_REFERENCE_SET o|--o{ EFFICIENCY_FACTOR : versions
-
-  SOIL_TYPE ||--o{ EFFICIENCY_FACTOR : defines
-  CROP ||--o{ SOIL_REFERENCE_RANGE : defines
-  CROP ||--o{ APPLICATION_SCHEDULE_RULE : schedules
-  CROP ||--o{ AGRONOMIC_PARAMETER : configures
-
-  AGRONOMIC_REFERENCE_SET {
-    uuid id PK
-    string key
-    string version
-    string source
-    string description
-    boolean is_active
-    datetime created_at
-  }
-
-  SOIL_TYPE {
-    uuid id PK
-    string name
-    string description
-  }
-
-  SOIL_REFERENCE_RANGE {
-    uuid id PK
-    uuid reference_set_id FK
-    uuid crop_id FK
-    string parameter
-    string label_es
-    string unit
-    string method
-    string confidence
-    float deficient_below
-    float optimal_min
-    float optimal_max
-    float critical_above
-    boolean high_is_generally_favorable
-    string notes
-  }
-
-  EFFICIENCY_FACTOR {
-    uuid id PK
-    uuid reference_set_id FK
-    uuid soil_type_id FK
-    string nutrient
-    float ef_min
-    float ef_max
-  }
-
-  AGRONOMIC_PARAMETER {
-    uuid id PK
-    uuid reference_set_id FK
-    uuid crop_id FK
-    string key
-    float value
-    string unit
-    string notes
-  }
-
-  %% Fertilization
-  FERTILIZER_PRODUCT ||--o{ FERTILIZER_PRODUCT_NUTRIENT : contains
-  PARCEL ||--o{ FERTILIZATION_PLAN : generates
-  READING o|--o{ FERTILIZATION_PLAN : originates
-  LAB_ANALYSIS o|--o{ FERTILIZATION_PLAN : originates
-  AGRONOMIC_REFERENCE_SET ||--o{ FERTILIZATION_PLAN : reproduces
-  FERTILIZATION_PLAN ||--o{ FERTILIZATION_PLAN_ITEM : contains
-  FERTILIZER_PRODUCT ||--o{ FERTILIZATION_PLAN_ITEM : recommends
-
-  FERTILIZER_PRODUCT {
-    uuid id PK
-    uuid reference_set_id FK
-    string key
-    string name
-    boolean is_low_chloride
-    boolean is_active
-  }
-
-  FERTILIZER_PRODUCT_NUTRIENT {
-    uuid id PK
-    uuid product_id FK
-    string nutrient
-    float fraction
-  }
-
-  APPLICATION_SCHEDULE_RULE {
-    uuid id PK
-    uuid reference_set_id FK
-    uuid crop_id FK
-    string life_stage
-    int sequence
-    string moment
-    int month_after_planting
-    float fraction
-  }
-
-  FERTILIZATION_PLAN {
-    uuid id PK
-    uuid parcel_id FK
-    uuid reading_id FK
-    uuid lab_analysis_id FK
-    uuid reference_set_id FK
-    string method
-    string input_fingerprint
-    json recommendation_snapshot
-    float target_green_kg_ha
-    int plant_age_months
-    string life_stage
-    string fruit_stage
-    string engine_version
-    string recommendation_status
-    json nutrient_requirements
-    json limiting_nutrients
-    json warnings
-    json assumptions
-    datetime generated_at
-  }
-  FERTILIZATION_PLAN_ITEM {
-    uuid id PK
-    uuid plan_id FK
-    uuid fertilizer_product_id FK
-    string scenario_name
-    string selection_method
-    boolean scenario_is_valid
-    int application_number
-    string moment
-    float fraction
-    float kg_ha
-    float kg_manzana
-    float g_plant
-    json guaranteed_analysis_pct
-    json nutrient_contributions_kg_ha
-  }
-  %% Farm events and finances
-  FARM ||--o{ ALERT : triggers
-  PARCEL o|--o{ ALERT : scopes
-  FARM ||--o{ EXPENSE : incurs
-  FARM ||--o{ INCOME : receives
-  FARM ||--o{ PRODUCTION : yields
-  INCOME o|--o{ PRODUCTION : aggregates
-
-  ALERT {
-    uuid id PK
-    uuid farm_id FK
-    uuid parcel_id FK
-    string type
-    string title
-    string message
-    string severity
-    date event_date
-    float risk_score
-    boolean is_active
-    datetime created_at
-  }
-
-  EXPENSE {
-    uuid id PK
-    uuid farm_id FK
-    string category
-    float amount
-    date expense_date
-  }
-
-  INCOME {
-    uuid id PK
-    uuid farm_id FK
-    float amount
-    date income_date
-  }
-
-  PRODUCTION {
-    uuid id PK
-    uuid farm_id FK
-    uuid income_id FK
-    float quantity
-    string unit
-    date harvest_date
-  }
+    %% AUTH_USER is external Supabase auth.users, represented by its id only.
+    %% SQLAlchemy models at main f986ccb; 2026-10-08.
+    AUTH_USER ||--o| USER : id
+    USER ||--o{ FARM : user_id
+    CROP ||--o{ PARCEL : crop_id
+    FARM ||--o{ PARCEL : farm_id
+    VARIETY o|--o{ PARCEL : variety_id
+    CROP ||--o{ VARIETY : crop_id
+    PARCEL ||--o{ READING : parcel_id
+    PARCEL ||--o{ LAB_ANALYSIS : parcel_id
+    CROP ||--o{ PHENOLOGICAL_STAGE_TEMPLATE : crop_id
+    PARCEL ||--o{ PARCEL_PHENOLOGICAL_STAGE : parcel_id
+    PHENOLOGICAL_STAGE_TEMPLATE ||--o{ PARCEL_PHENOLOGICAL_STAGE : template_id
+    CROP ||--o{ OPTIMAL_REQUIREMENT : crop_id
+    AGRONOMIC_REFERENCE_SET o|--o{ OPTIMAL_REQUIREMENT : reference_set_id
+    PHENOLOGICAL_STAGE_TEMPLATE ||--o{ OPTIMAL_REQUIREMENT : stage_id
+    CROP ||--o{ EXTRACTION_INDEX : crop_id
+    AGRONOMIC_REFERENCE_SET o|--o{ EXTRACTION_INDEX : reference_set_id
+    AGRONOMIC_REFERENCE_SET o|--o{ VARIETY_FACTOR : reference_set_id
+    VARIETY ||--o{ VARIETY_FACTOR : variety_id
+    AGRONOMIC_REFERENCE_SET o|--o{ STAGE_FACTOR : reference_set_id
+    PHENOLOGICAL_STAGE_TEMPLATE ||--o{ STAGE_FACTOR : stage_id
+    AGRONOMIC_REFERENCE_SET o|--o{ EFFICIENCY_FACTOR : reference_set_id
+    SOIL_TYPE ||--o{ EFFICIENCY_FACTOR : soil_type_id
+    LAB_ANALYSIS o|--o{ FERTILIZATION_PLAN : lab_analysis_id
+    PARCEL ||--o{ FERTILIZATION_PLAN : parcel_id
+    READING o|--o{ FERTILIZATION_PLAN : reading_id
+    AGRONOMIC_REFERENCE_SET ||--o{ FERTILIZATION_PLAN : reference_set_id
+    FERTILIZER_PRODUCT ||--o{ FERTILIZATION_PLAN_ITEM : fertilizer_product_id
+    FERTILIZATION_PLAN ||--o{ FERTILIZATION_PLAN_ITEM : plan_id
+    CROP ||--o{ SOIL_REFERENCE_RANGE : crop_id
+    AGRONOMIC_REFERENCE_SET ||--o{ SOIL_REFERENCE_RANGE : reference_set_id
+    AGRONOMIC_REFERENCE_SET ||--o{ FERTILIZER_PRODUCT : reference_set_id
+    FERTILIZER_PRODUCT ||--o{ FERTILIZER_PRODUCT_NUTRIENT : product_id
+    CROP ||--o{ APPLICATION_SCHEDULE_RULE : crop_id
+    AGRONOMIC_REFERENCE_SET ||--o{ APPLICATION_SCHEDULE_RULE : reference_set_id
+    CROP ||--o{ AGRONOMIC_PARAMETER : crop_id
+    AGRONOMIC_REFERENCE_SET ||--o{ AGRONOMIC_PARAMETER : reference_set_id
+    FARM ||--o{ ALERT : farm_id
+    PARCEL o|--o{ ALERT : parcel_id
+    FARM ||--o{ EXPENSE : farm_id
+    FARM ||--o{ INCOME : farm_id
+    FARM ||--o{ PRODUCTION : farm_id
+    INCOME o|--o{ PRODUCTION : income_id
+    AUTH_USER {
+        uuid id PK
+    }
+    USER {
+        uuid id PK,FK
+        string name
+        string email UK
+        string role
+        date birth_date "nullable"
+        string gender "nullable"
+        string phone "nullable"
+        string country "nullable"
+        string department "nullable"
+        string address "nullable"
+        datetime created_at
+        datetime updated_at
+    }
+    FARM {
+        uuid user_id FK
+        string name
+        float area_hectares
+        float latitude
+        float longitude
+        uuid id PK
+        datetime created_at
+        datetime updated_at
+    }
+    PARCEL {
+        uuid farm_id FK
+        uuid crop_id FK
+        uuid variety_id FK "nullable"
+        string name
+        float area_hectares
+        int plants_per_hectare "nullable"
+        date planting_date
+        uuid id PK
+        datetime created_at
+        datetime updated_at
+    }
+    CROP {
+        string name UK
+        uuid id PK
+        datetime created_at
+        datetime updated_at
+    }
+    VARIETY {
+        uuid crop_id FK
+        string name
+        uuid id PK
+        datetime created_at
+        datetime updated_at
+    }
+    READING {
+        uuid parcel_id FK
+        float nitrogen
+        float phosphorus
+        float potassium
+        float ec
+        float ph
+        float temperature
+        float humidity
+        datetime recorded_at
+        uuid id PK
+    }
+    LAB_ANALYSIS {
+        uuid parcel_id FK
+        string sample_code "nullable"
+        datetime sampled_at "nullable"
+        float depth_start_cm "nullable"
+        float depth_end_cm "nullable"
+        float ph
+        string ph_method "nullable"
+        float ec "nullable"
+        string ec_method "nullable"
+        float organic_matter_pct
+        float cic
+        float clay_pct
+        float silt_pct
+        float sand_pct
+        float nitrogen
+        float phosphorus
+        string phosphorus_method "nullable"
+        float potassium
+        string potassium_method "nullable"
+        float calcium
+        float magnesium
+        float sulfur
+        string lab
+        datetime recorded_at
+        uuid id PK
+    }
+    PHENOLOGICAL_STAGE_TEMPLATE {
+        uuid crop_id FK
+        string name
+        int stage_order
+        int duration_days "nullable"
+        uuid id PK
+    }
+    PARCEL_PHENOLOGICAL_STAGE {
+        uuid parcel_id FK
+        uuid template_id FK
+        date estimated_date "nullable"
+        date actual_date "nullable"
+        datetime selected_at
+        uuid id PK
+    }
+    OPTIMAL_REQUIREMENT {
+        uuid reference_set_id FK "nullable"
+        uuid crop_id FK
+        uuid stage_id FK
+        string nutrient
+        float min_value
+        float max_value
+        uuid id PK
+    }
+    EXTRACTION_INDEX {
+        uuid reference_set_id FK "nullable"
+        uuid crop_id FK
+        string nutrient
+        float ie_value
+        uuid id PK
+    }
+    VARIETY_FACTOR {
+        uuid reference_set_id FK "nullable"
+        uuid variety_id FK
+        string nutrient
+        float fv_factor
+        uuid id PK
+    }
+    STAGE_FACTOR {
+        uuid reference_set_id FK "nullable"
+        uuid stage_id FK
+        string nutrient
+        float fe_factor
+        uuid id PK
+    }
+    SOIL_TYPE {
+        string name UK
+        string description "nullable"
+        uuid id PK
+    }
+    EFFICIENCY_FACTOR {
+        uuid reference_set_id FK "nullable"
+        uuid soil_type_id FK
+        string nutrient
+        float ef_min
+        float ef_max
+        uuid id PK
+    }
+    FERTILIZATION_PLAN {
+        uuid parcel_id FK
+        uuid reading_id FK "nullable"
+        uuid lab_analysis_id FK "nullable"
+        uuid reference_set_id FK
+        string method
+        string input_fingerprint "nullable"
+        json recommendation_snapshot "nullable"
+        float target_green_kg_ha
+        int plant_age_months
+        string life_stage
+        string fruit_stage
+        string engine_version
+        string recommendation_status
+        json nutrient_requirements
+        json limiting_nutrients
+        json warnings
+        json assumptions
+        datetime generated_at
+        uuid id PK
+    }
+    FERTILIZATION_PLAN_ITEM {
+        uuid plan_id FK
+        uuid fertilizer_product_id FK
+        string scenario_name
+        string selection_method
+        bool scenario_is_valid
+        int application_number
+        string moment
+        float fraction
+        float kg_ha
+        float kg_manzana
+        float g_plant
+        json guaranteed_analysis_pct
+        json nutrient_contributions_kg_ha
+        uuid id PK
+    }
+    AGRONOMIC_REFERENCE_SET {
+        string key
+        string version
+        string source
+        string description "nullable"
+        bool is_active
+        datetime created_at
+        uuid id PK
+    }
+    SOIL_REFERENCE_RANGE {
+        uuid reference_set_id FK
+        uuid crop_id FK
+        string parameter
+        string label_es
+        string unit
+        string method
+        string confidence
+        float deficient_below "nullable"
+        float optimal_min "nullable"
+        float optimal_max "nullable"
+        float critical_above "nullable"
+        bool high_is_generally_favorable
+        string notes
+        uuid id PK
+    }
+    FERTILIZER_PRODUCT {
+        uuid reference_set_id FK
+        string key
+        string name
+        bool is_low_chloride
+        bool is_active
+        uuid id PK
+    }
+    FERTILIZER_PRODUCT_NUTRIENT {
+        uuid product_id FK
+        string nutrient
+        float fraction
+        uuid id PK
+    }
+    APPLICATION_SCHEDULE_RULE {
+        uuid reference_set_id FK
+        uuid crop_id FK
+        string life_stage
+        int sequence
+        string moment
+        int month_after_planting "nullable"
+        float fraction
+        uuid id PK
+    }
+    AGRONOMIC_PARAMETER {
+        uuid reference_set_id FK
+        uuid crop_id FK
+        string key
+        float value
+        string unit "nullable"
+        string notes "nullable"
+        uuid id PK
+    }
+    ALERT {
+        uuid farm_id FK
+        uuid parcel_id FK "nullable"
+        string type
+        string title
+        string message
+        string severity
+        date event_date "nullable"
+        float risk_score "nullable"
+        bool is_active
+        datetime created_at
+        uuid id PK
+    }
+    EXPENSE {
+        uuid farm_id FK
+        string category
+        decimal amount
+        date expense_date
+        uuid id PK
+    }
+    INCOME {
+        uuid farm_id FK
+        string category
+        decimal amount
+        date income_date
+        uuid id PK
+    }
+    PRODUCTION {
+        uuid farm_id FK
+        uuid income_id FK "nullable"
+        float quantity
+        string unit
+        date harvest_date
+        uuid id PK
+    }

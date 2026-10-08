@@ -1,0 +1,21 @@
+flowchart TD
+    Start["Solicitar recomendación"] --> Auth["Validar usuario y acceso a parcela"]
+    Auth --> Input["Resolver contexto, fuente de suelo y configuración activa"]
+    Input --> Valid{"Entradas válidas?"}
+    Valid -->|No| Error["Responder error de contrato o cálculo"]
+    Valid -->|Sí| Hash["Construir huella de entradas y capacidad orgánica"]
+    Hash --> Cache{"Plan equivalente guardado?"}
+    Cache -->|Sí| Load["Recuperar snapshot"]
+    Cache -->|No| Age{"Edad del café"}
+    Age -->|Hasta 3 meses| Nursery["Sin dosis de campo"]
+    Age -->|4 a 24 meses| Young["Plan general acumulado de café joven"]
+    Age -->|Más de 24 meses| Mineral["Balance NPK y escenarios minerales"]
+    Mineral --> Opt{"Solicita Orgánico?"}
+    Opt -->|Sí| Organic["Comparar perfiles Bocashi, Biol y Compost: can_apply false"]
+    Opt -->|No| Save["Persistir snapshot y filas minerales"]
+    Organic --> Save
+    Nursery --> Save
+    Young --> Save
+    Save --> Filter["Filtrar capacidades de respuesta"]
+    Load --> Filter
+    Filter --> UI["Mostrar cantidades, calendario permitido y advertencias"]

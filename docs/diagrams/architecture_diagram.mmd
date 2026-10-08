@@ -1,0 +1,13 @@
+flowchart LR
+    Sensor["Sensor de suelo genérico 7 en 1"] -->|USB OTG Android| App["Flutter móvil / web"]
+    Lab["Captura manual de laboratorio"] --> App
+    App <-->|Sesión y MFA TOTP| Auth["Supabase Auth"]
+    App <-->|REST y JWT| API["FastAPI: autorización por rol y finca"]
+    Auth -->|JWKS| API
+    API <--> DB[("PostgreSQL: modelos y migraciones Alembic")]
+    API --> Engine["Motor café NPK: referencias versionadas"]
+    Engine --> Organic["Evaluación orgánica optativa: sin aplicaciones aprobadas"]
+    API --> Finance["Ingresos, egresos y tablero financiero"]
+    API --> Pheno["Plantillas e instancias fenológicas"]
+    API --> Climate["Pronóstico y alertas lluvia/calor"]
+    Climate <-->|HTTP| Weather["Open-Meteo / proveedor de respaldo"]
