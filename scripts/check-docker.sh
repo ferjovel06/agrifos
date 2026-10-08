@@ -120,7 +120,8 @@ check_images() {
   [[ "$(cd "$evidence_dir" && pwd -P)" == "$evidence_dir" ]] || fail 'Scanner evidence must stay inside this checkout.'
   [[ "$(cd "$cache_dir" && pwd -P)" == "$cache_dir" ]] || fail 'Scanner cache must stay inside this checkout.'
   printf '%s\n' "$runtime_id" > "$evidence_dir/runtime-image-id.txt"
-  docker image save --output "$(native_path "$evidence_dir/runtime-image.tar")" "$runtime_image"
+  # Export the inspected immutable ID even if a concurrent build replaces the tag.
+  docker image save --output "$(native_path "$evidence_dir/runtime-image.tar")" "$runtime_id"
   local scanner_uid=1000 scanner_gid=1000
   case "$(uname -s)" in MINGW*|MSYS*) ;; *) scanner_uid="$(id -u)"; scanner_gid="$(id -g)" ;; esac
   local scanner_options=(--rm --platform linux/amd64 --user "$scanner_uid:$scanner_gid"
