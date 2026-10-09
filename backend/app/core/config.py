@@ -11,6 +11,7 @@ class Settings(BaseSettings):
     DB_POOL_RECYCLE_SECONDS: int = 300
 
     SUPABASE_URL: str
+    SUPABASE_JWKS_URL: str | None = None
     WEATHER_TIMEOUT_SECONDS: float = Field(default=15.0, gt=0)
     WEATHER_CONNECT_TIMEOUT_SECONDS: float = Field(default=5.0, gt=0)
     WEATHER_REQUEST_ATTEMPTS: int = Field(default=2, ge=1)
@@ -26,6 +27,13 @@ class Settings(BaseSettings):
         "Agrifos/0.1 https://github.com/ferjovel06/agrifos"
     )
     ALLOWED_ORIGINS: str = ""
+
+    @property
+    def supabase_jwks_url(self) -> str:
+        return (
+            self.SUPABASE_JWKS_URL
+            or f"{self.SUPABASE_URL.rstrip('/')}/auth/v1/.well-known/jwks.json"
+        )
 
     @property
     def cors_origins(self) -> list[str]:

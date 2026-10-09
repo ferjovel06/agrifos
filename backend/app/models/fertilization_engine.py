@@ -16,7 +16,10 @@ class OptimalRequirement(Base, UUIDPKMixin):
 
     crop_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("crops.id"), nullable=False)
     stage_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey("phenological_stage_templates.id"), nullable=False
+        ForeignKey(
+            "phenological_stage_templates.id", ondelete="RESTRICT",
+            name="fk_optimal_requirement_stage_template",
+        ), nullable=False
     )
     nutrient: Mapped[str] = mapped_column(String(30))
     min_value: Mapped[float] = mapped_column(Float)
@@ -69,7 +72,10 @@ class StageFactor(Base, UUIDPKMixin):
     )
 
     stage_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey("phenological_stage_templates.id"), nullable=False
+        ForeignKey(
+            "phenological_stage_templates.id", ondelete="RESTRICT",
+            name="fk_stage_factor_stage_template",
+        ), nullable=False
     )
     nutrient: Mapped[str] = mapped_column(String(30))
     fe_factor: Mapped[float] = mapped_column(Float)

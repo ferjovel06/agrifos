@@ -29,6 +29,14 @@ docs/rules/**
 
 tmp/
 
+# Local container configuration, downloaded tools and exported artifacts
+.docker/
+.tools/
+artifacts/
+supabase/.local/
+docker/**/__pycache__/
+docker/**/*.pyc
+
 # Local development demos and previews
 /backend/tools/
 /app_flutter/tool/

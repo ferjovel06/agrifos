@@ -1,20 +1,156 @@
+name: agrifos
+
+x-backend-environment: &backend-environment
+  ENV: development
+  APP_DEBUG: "false"
+
+x-backend-config: &backend-config
+  env_file:
+    - path: ${AGRIFOS_ENV_DIR:-.docker/local}/backend.env
+      required: false
+  environment: *backend-environment
+  networks: [supabase]
+  init: true
+  cap_drop: [ALL]
+  security_opt: ["no-new-privileges:true"]
+
 services:
-  api:
-    image: agrifos-backend:local
+  migrate:
+    <<: *backend-config
+    image: agrifos-backend:runtime
     build:
       context: backend
       target: runtime
-    env_file: backend/.env
-    ports:
-      - "${API_BIND_ADDRESS:-127.0.0.1}:${API_PORT:-8000}:8000"
+    command: [python, /checks/readiness.py, migrate]
     volumes:
-      - ./backend/app:/app/app:ro
-    command: [uvicorn, app.main:app, --host, "0.0.0.0", --port, "8000", --reload]
+      - ./docker/readiness.py:/checks/readiness.py:ro
 
-  backend-tests:
-    profiles: [test]
-    image: agrifos-backend:local-test
+  api:
+    <<: *backend-config
+    image: agrifos-backend:development
+    build:
+      context: backend
+      target: development
+    command: [uvicorn, "app.main:app", --host, "0.0.0.0", --port, "8000", --reload, --reload-dir, app]
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    ports: ["127.0.0.1:${AGRIFOS_API_PORT:-8000}:8000"]
+    volumes:
+      - ./backend/app:/workspace/backend/app:ro
+      - ./backend/alembic:/workspace/backend/alembic:ro
+    healthcheck:
+      test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/db', timeout=4).read()"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+
+  api-runtime:
+    <<: *backend-config
+    profiles: [runtime]
+    image: agrifos-backend:runtime
+    build:
+      context: backend
+      target: runtime
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    ports: ["127.0.0.1:${AGRIFOS_API_PORT:-8000}:8000"]
+    healthcheck:
+      test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/db', timeout=4).read()"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+  backend-unit:
+    profiles: [unit]
+    image: agrifos-backend:test
     build:
       context: backend
       target: test
     network_mode: none
+    environment:
+      UV_NO_SYNC: "1"
+      UV_OFFLINE: "1"
+    command: [bash, /workspace/scripts/test-backend.sh]
+    volumes:
+      - ./scripts/test-backend.sh:/workspace/scripts/test-backend.sh:ro
+      - ./scripts/supabase-local.sh:/workspace/scripts/supabase-local.sh:ro
+      - ./docker:/checks:ro
+    init: true
+
+  integration:
+    profiles: [integration]
+    image: agrifos-backend:test
+    build:
+      context: backend
+      target: test
+    env_file:
+      - path: ${AGRIFOS_ENV_DIR:-.docker/local}/backend.env
+        required: false
+      - path: ${AGRIFOS_ENV_DIR:-.docker/local}/integration.env
+        required: false
+    command: [python, /checks/integration.py]
+    environment:
+      PYTHONPATH: /workspace/backend
+    user: "${AGRIFOS_UID:-1000}:${AGRIFOS_GID:-1000}"
+    volumes:
+      - ./docker/integration.py:/checks/integration.py:ro
+      - ./docker/schema_check.py:/checks/schema_check.py:ro
+      - ./${AGRIFOS_ENV_DIR:-.docker/local}/supabase/.local/signing-keys.json:/test-signing-keys.json:ro
+      - ./${AGRIFOS_ENV_DIR:-.docker/local}/evidence:/evidence
+    networks: [supabase]
+    init: true
+
+  flutter-tools:
+    profiles: [flutter]
+    image: agrifos-flutter:tools
+    network_mode: bridge
+    build:
+      context: docker/flutter
+      target: tools
+      args:
+        FLUTTER_UID: ${AGRIFOS_UID:-1000}
+        FLUTTER_GID: ${AGRIFOS_GID:-1000}
+    volumes:
+      - ./app_flutter:/source:ro
+      - ./${AGRIFOS_CLIENT_ENV:-docker/client.env.example}:/config/client.env:ro
+      - flutter-workspace:/workspace
+      - flutter-pub:/home/flutter/.pub-cache
+      - flutter-gradle:/home/flutter/.gradle
+      - ./artifacts:/artifacts
+    init: true
+
+  flutter-android:
+    profiles: [android]
+    image: agrifos-flutter:android
+    network_mode: bridge
+    build:
+      context: docker/flutter
+      target: android
+      args:
+        FLUTTER_UID: ${AGRIFOS_UID:-1000}
+        FLUTTER_GID: ${AGRIFOS_GID:-1000}
+    volumes:
+      - ./app_flutter:/source:ro
+      - ./${AGRIFOS_CLIENT_ENV:-docker/client.env.example}:/config/client.env:ro
+      - flutter-workspace:/workspace
+      - flutter-pub:/home/flutter/.pub-cache
+      - flutter-gradle:/home/flutter/.gradle
+      - flutter-sdk:/opt/android-sdk
+      - ./artifacts:/artifacts
+    stdin_open: true
+    tty: true
+    init: true
+
+networks:
+  supabase:
+    external: true
+    name: ${AGRIFOS_NETWORK:-agrifos-local}
+
+volumes:
+  flutter-workspace:
+  flutter-pub:
+  flutter-gradle:
+  flutter-sdk:
