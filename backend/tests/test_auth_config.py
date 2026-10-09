@@ -7,6 +7,7 @@ import jwt
 from cryptography.hazmat.primitives.asymmetric import ec
 from fastapi import HTTPException
 from fastapi.security import HTTPAuthorizationCredentials
+from pydantic import ValidationError
 
 from app.core import auth
 from app.core.config import Settings
@@ -50,6 +51,59 @@ class SupabaseJwksConfigurationTests(unittest.TestCase):
 
         self.assertEqual(settings.supabase_jwks_url, internal_url)
         self.assertEqual(settings.SUPABASE_URL, "http://127.0.0.1:54321")
+
+
+class WeatherAndAuthConfigurationTests(unittest.TestCase):
+    def make_settings(self, **overrides):
+        # Exercise defaults independently of the contributor's dotenv/environment.
+        with patch.dict("os.environ", {}, clear=True):
+            return Settings(
+                _env_file=None,
+                DATABASE_URL="postgresql+asyncpg://postgres:test@localhost/agrifos_test",
+                SUPABASE_URL="http://127.0.0.1:54321",
+                **overrides,
+            )
+
+    def test_weather_defaults_preserve_optional_public_jwks(self):
+        settings = self.make_settings()
+
+        self.assertIsNone(settings.SUPABASE_JWKS_URL)
+        self.assertEqual(settings.supabase_jwks_url, "http://127.0.0.1:54321/auth/v1/.well-known/jwks.json")
+        self.assertEqual(
+            (settings.WEATHER_TIMEOUT_SECONDS, settings.WEATHER_CONNECT_TIMEOUT_SECONDS,
+             settings.WEATHER_REQUEST_ATTEMPTS, settings.WEATHER_FALLBACK_REQUEST_ATTEMPTS),
+            (15.0, 5.0, 2, 1),
+        )
+
+    def test_internal_jwks_coexists_with_custom_weather_policy(self):
+        internal_url = "http://supabase_kong_agrifos:8000/auth/v1/.well-known/jwks.json"
+        settings = self.make_settings(
+            SUPABASE_JWKS_URL=internal_url,
+            WEATHER_TIMEOUT_SECONDS=31.0,
+            WEATHER_CONNECT_TIMEOUT_SECONDS=6.0,
+            WEATHER_REQUEST_ATTEMPTS=4,
+            WEATHER_FALLBACK_REQUEST_ATTEMPTS=2,
+        )
+
+        self.assertEqual(settings.supabase_jwks_url, internal_url)
+        self.assertEqual(settings.SUPABASE_URL, "http://127.0.0.1:54321")
+        self.assertEqual(
+            (settings.WEATHER_TIMEOUT_SECONDS, settings.WEATHER_CONNECT_TIMEOUT_SECONDS,
+             settings.WEATHER_REQUEST_ATTEMPTS, settings.WEATHER_FALLBACK_REQUEST_ATTEMPTS),
+            (31.0, 6.0, 4, 2),
+        )
+
+    def test_invalid_weather_limits_are_rejected_with_internal_jwks(self):
+        for name in ("WEATHER_TIMEOUT_SECONDS", "WEATHER_CONNECT_TIMEOUT_SECONDS",
+                     "WEATHER_REQUEST_ATTEMPTS", "WEATHER_FALLBACK_REQUEST_ATTEMPTS"):
+            for value in (0, -1):
+                with self.subTest(setting=name, value=value):
+                    with self.assertRaises(ValidationError) as raised:
+                        self.make_settings(
+                            SUPABASE_JWKS_URL="http://supabase_kong_agrifos:8000/auth/v1/.well-known/jwks.json",
+                            **{name: value},
+                        )
+                    self.assertIn((name,), [error["loc"] for error in raised.exception.errors()])
 
 
 class VerifiedClaimsCryptographyTests(unittest.IsolatedAsyncioTestCase):

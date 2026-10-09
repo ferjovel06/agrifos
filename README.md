@@ -170,6 +170,10 @@ ALLOWED_ORIGINS=http://localhost:3000,http://localhost:8080
 WEATHER_API_BASE_URL=https://api.open-meteo.com/v1
 WEATHER_FALLBACK_API_BASE_URL=https://api.met.no/weatherapi/locationforecast/2.0
 WEATHER_FALLBACK_USER_AGENT=Agrifos/0.1 https://github.com/ferjovel06/agrifos
+WEATHER_TIMEOUT_SECONDS=15
+WEATHER_CONNECT_TIMEOUT_SECONDS=5
+WEATHER_REQUEST_ATTEMPTS=2
+WEATHER_FALLBACK_REQUEST_ATTEMPTS=1
 ```
 
 App Flutter (`app_flutter/.env`):

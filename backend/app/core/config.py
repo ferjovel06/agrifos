@@ -1,3 +1,4 @@
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -11,6 +12,10 @@ class Settings(BaseSettings):
 
     SUPABASE_URL: str
     SUPABASE_JWKS_URL: str | None = None
+    WEATHER_TIMEOUT_SECONDS: float = Field(default=15.0, gt=0)
+    WEATHER_CONNECT_TIMEOUT_SECONDS: float = Field(default=5.0, gt=0)
+    WEATHER_REQUEST_ATTEMPTS: int = Field(default=2, ge=1)
+    WEATHER_FALLBACK_REQUEST_ATTEMPTS: int = Field(default=1, ge=1)
     WEATHER_API_BASE_URL: str = "https://api.open-meteo.com/v1"
     WEATHER_FALLBACK_API_BASE_URL: str = (
         "https://api.met.no/weatherapi/locationforecast/2.0"
