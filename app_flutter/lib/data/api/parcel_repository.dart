@@ -87,11 +87,10 @@ class ParcelRepository {
       if (runtime.requireAccount() != account) {
         throw ApiAuthException('La cuenta cambió.');
       }
-      await runtime.database
-          .customStatement('DELETE FROM cache WHERE account=? AND key=?', [
-            runtime.requireAccount(),
-            '/phenological-stages/instances:{"parcel_id":"$parcelId"}',
-          ]);
+      await runtime.database.invalidateCache(
+        runtime.requireAccount(),
+        '/phenological-stages/instances:{"parcel_id":"$parcelId"}',
+      );
       await runtime.engine.synchronize();
     }
   }

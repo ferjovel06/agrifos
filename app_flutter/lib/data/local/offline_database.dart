@@ -15,6 +15,25 @@ class OfflineDatabase extends GeneratedDatabase {
 
   final AccountKey accountKey;
   final _cipher = AesGcm.with256bits();
+  final Map<String, Future<SecretKey>> _cacheKeys = {};
+  Future<String> _cacheKey(String account, String logical) async {
+    // Coordinates and query parameters must not remain in plaintext metadata.
+    final key = await _cacheKeys.putIfAbsent(
+      account,
+      () async => Hkdf(hmac: Hmac.sha256(), outputLength: 32).deriveKey(
+        secretKey: await accountKey(account),
+        nonce: utf8.encode('agrifos-cache-lookup-v1'),
+        info: const [],
+      ),
+    );
+    final mac = await Hmac.sha256().calculateMac(
+      utf8.encode(logical),
+      secretKey: key,
+    );
+    return mac.bytes
+        .map((byte) => byte.toRadixString(16).padLeft(2, '0'))
+        .join();
+  }
 
   @override
   int get schemaVersion => 1;
@@ -382,7 +401,7 @@ class OfflineDatabase extends GeneratedDatabase {
   Future<Map<String, dynamic>?> cache(String account, String key) async {
     final row = (await rows('SELECT * FROM cache WHERE account=? AND key=?', [
       account,
-      key,
+      await _cacheKey(account, key),
     ])).firstOrNull;
     if (row == null) return null;
     return {
@@ -403,9 +422,15 @@ class OfflineDatabase extends GeneratedDatabase {
       ON CONFLICT(account,key) DO UPDATE SET data=excluded.data,checked_at=excluded.checked_at''',
     [
       account,
-      key,
+      await _cacheKey(account, key),
       await encrypt(account, 'cache:$key', data),
       now.millisecondsSinceEpoch,
     ],
   );
+
+  Future<void> invalidateCache(String account, String key) async =>
+      customStatement('DELETE FROM cache WHERE account=? AND key=?', [
+        account,
+        await _cacheKey(account, key),
+      ]);
 }

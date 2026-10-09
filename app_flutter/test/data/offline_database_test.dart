@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:convert';
 import 'package:cryptography/cryptography.dart';
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -7,6 +8,26 @@ import 'package:app_flutter/data/local/offline_database.dart';
 Future<SecretKey> key(String user) async =>
     SecretKey(List.filled(32, user == 'farmer-a' ? 7 : 8));
 void main() {
+  test(
+    'private coordinates are hidden in cache keys as well as encrypted payloads',
+    () async {
+      final db = OfflineDatabase(NativeDatabase.memory(), accountKey: key);
+      const logical = 'weather:v1:12.1123:-86.2234:7';
+      await db.putCache('farmer-a', logical, {
+        'temperature': 25,
+      }, DateTime.utc(2026));
+      final stored = (await db.rows('SELECT key,data FROM cache', [])).single;
+      expect(stored['key'], matches(RegExp(r'^[a-f0-9]{64}$')));
+      expect(jsonEncode(stored).contains('12.1123'), isFalse);
+      expect((await db.cache('farmer-a', logical))!['data'], {
+        'temperature': 25,
+      });
+      expect(await db.cache('farmer-b', logical), isNull);
+      await db.invalidateCache('farmer-a', logical);
+      expect(await db.cache('farmer-a', logical), isNull);
+      await db.close();
+    },
+  );
   test(
     'downloaded committed create keeps its stable retry after a lost acknowledgement',
     () async {
