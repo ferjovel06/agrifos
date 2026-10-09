@@ -10,7 +10,7 @@ from math import isfinite, sqrt
 from statistics import fmean, median, pstdev
 from typing import Literal, Sequence
 
-ALGORITHM_VERSION = "same-point-centered-1"
+ALGORITHM_VERSION = "same-point-centered-2"
 _NUTRIENTS = {"N", "NO3-N", "NO3", "P", "P2O5", "K", "K2O", "nitrogen", "phosphorus", "potassium"}
 _UNITS = {**{name: {"mg/kg", "mg/L", "ppm", "%"} for name in _NUTRIENTS},
           "humidity": {"%"}, "temperature": {"degC"}, "ph": {"pH"},
@@ -34,6 +34,8 @@ class MeasurementSample:
     declared_range: tuple[float, float] | None = None
     device_model: str | None = None
     depth_cm: float | None = None
+    acquisition_profile_id: str | None = None
+    soil_type: str | None = None
 
 
 @dataclass(frozen=True)
@@ -149,7 +151,8 @@ def process_measurements(samples: Sequence[MeasurementSample],
     physical_context = None
     for i, sample in enumerate(samples):
         context = (sample.session_id, sample.device_id, sample.parcel_id, sample.point_id,
-                   sample.protocol_version, sample.device_model, sample.depth_cm)
+                   sample.protocol_version, sample.device_model, sample.depth_cm,
+                   sample.acquisition_profile_id, sample.soil_type)
         if context != physical_context:
             last_by_variable.clear()
             physical_context = context

@@ -73,6 +73,15 @@ class MeasurementProcessingTests(unittest.TestCase):
                 raw[2] = replace(raw[2], **{attribute: alternate})
                 self.assertEqual(process_measurements(raw)[2].filtered, 100)
 
+    def test_decoder_and_documented_soil_changes_are_physical_run_boundaries(self):
+        for attribute, known in (("acquisition_profile_id", "decoder-v1"), ("soil_type", "clay")):
+            with self.subTest(attribute=attribute):
+                raw = samples([15.2, 15.4, 45, 15.5, 15.3], **{attribute: known})
+                raw[2] = replace(raw[2], **{attribute: "different"})
+                result = process_measurements(raw)
+                self.assertEqual(result[2].filtered, 45)
+                self.assertIn("INSUFFICIENT_REPETITIONS", result[2].reason_codes)
+
     def test_revisit_point_and_missing_point_do_not_join_repetitions(self):
         raw = samples([1, 1, 100, 1, 1])
         raw[2] = replace(raw[2], point_id="b")

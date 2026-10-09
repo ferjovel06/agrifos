@@ -65,7 +65,8 @@ def process_originals(readings: list[Reading], *, window_size: int = 5, method: 
                 acquired_at=provenance.acquired_at, received_at=reading.received_at,
                 protocol_version=provenance.protocol_version, reading_status=variable.read_status if variable is not None else "invalid",
                 declared_range=variable.declared_range if variable is not None else None,
-                device_model=provenance.sensor_model, depth_cm=provenance.depth_cm))
+                device_model=provenance.sensor_model, depth_cm=provenance.depth_cm,
+                acquisition_profile_id=provenance.profile_id, soil_type=provenance.soil_type))
         for processed in process_measurements(samples, ProcessingConfig(window=window_size, method=method)):
             if processed.raw.measurement_id in present_ids:
                 output[processed.raw.measurement_id][variable_key] = _jsonable(asdict(processed))
