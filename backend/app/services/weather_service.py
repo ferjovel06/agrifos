@@ -1,6 +1,9 @@
 import asyncio
 from dataclasses import dataclass
 from datetime import date, datetime
+from datetime import UTC
+import math
+import uuid
 from time import monotonic
 from typing import Any, Awaitable, Callable
 
@@ -148,15 +151,29 @@ class WeatherService:
         self,
         provider: WeatherProvider,
         cache: WeatherForecastCache | None = None,
+        persistent: bool = False,
+        persistent_cache=None,
     ):
         self._provider = provider
         self._cache = cache or _shared_forecast_cache
+        self._persistent = persistent
+        self._persistent_cache = persistent_cache
 
     async def forecast(self, farm: Farm, days: int) -> WeatherForecastRead:
-        cache_key = (str(farm.id), farm.latitude, farm.longitude, days)
-        return await self._cache.get_or_load(
-            cache_key, lambda: self._load_forecast(farm, days),
-        )
+        latitude = math.trunc(farm.latitude * 10000) / 10000
+        longitude = math.trunc(farm.longitude * 10000) / 10000
+        cache_key = ("forecast-v1", latitude, longitude, days)
+        neutral = Farm(id=uuid.UUID(int=0), name="", latitude=latitude, longitude=longitude)
+        if self._persistent:
+            forecast = await self._persistent_cache.get_or_load(
+                (latitude, longitude, days), lambda: self._load_forecast(neutral, days),
+            ) if self._persistent_cache is not None else await self._load_forecast(neutral, days)
+        else:
+            forecast = await self._cache.get_or_load(
+                cache_key, lambda: self._load_forecast(neutral, days),
+            )
+        # Private identity is added AFTER retrieving the shared forecast.
+        return forecast.model_copy(update={"farm_id": farm.id, "farm_name": farm.name})
 
     async def _load_forecast(self, farm: Farm, days: int) -> WeatherForecastRead:
         try:
@@ -175,7 +192,13 @@ class WeatherService:
 def _build_forecast(
     payload: dict[str, Any], farm: Farm, days: int,
 ) -> WeatherForecastRead:
+    metadata = payload.get("_agrifos_cache", {})
     return WeatherForecastRead(
+        generated_at=payload.get("generated_at"),
+        consulted_at=metadata.get("consulted_at"),
+        updated_at=metadata.get("updated_at"),
+        fresh_until=metadata.get("fresh_until"),
+        freshness=metadata.get("freshness", "fresh"),
         farm_id=farm.id,
         farm_name=farm.name,
         provider=payload.get("provider", "Open-Meteo"),

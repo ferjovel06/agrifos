@@ -1,6 +1,7 @@
 """HTTP lifecycle, retries and error translation for weather requests."""
 
 from typing import Any
+import asyncio
 
 import httpx
 
@@ -51,12 +52,14 @@ class HttpWeatherTransport:
         timeout_seconds: float,
         connect_timeout_seconds: float,
         client: httpx.AsyncClient | None = None,
+        cache=None,
     ):
         if attempts < 1:
             raise ValueError("Weather request attempts must be positive.")
         self._attempts = attempts
         self._timeout = httpx.Timeout(timeout_seconds, connect=connect_timeout_seconds)
         self._client = client
+        self._cache = cache
 
     async def get_json(
         self,
@@ -66,25 +69,39 @@ class HttpWeatherTransport:
         headers: dict[str, str] | None = None,
     ) -> dict[str, Any]:
         if self._client is not None:
-            return await self._request(self._client, url, params, headers)
+            return await self._get(self._client, url, params, headers)
         async with httpx.AsyncClient(timeout=self._timeout) as client:
-            return await self._request(client, url, params, headers)
+            return await self._get(client, url, params, headers)
 
-    async def _request(
+    async def _get(self, client, url, params, headers):
+        if self._cache is not None:
+            return await self._cache.get_json(
+                url, params, headers,
+                lambda conditional: self._response(client, url, params, conditional),
+                _decode_json, _provider_error,
+            )
+        return _decode_json(await self._response(client, url, params, headers))
+
+    async def _response(
         self,
         client: httpx.AsyncClient,
         url: str,
         params: dict[str, Any],
         headers: dict[str, str] | None,
-    ) -> dict[str, Any]:
+    ) -> httpx.Response:
         remaining_attempts = self._attempts
         while True:
             remaining_attempts -= 1
             try:
                 response = await client.get(url, params=params, headers=headers)
+                if response.status_code == 304:
+                    return response
                 response.raise_for_status()
             except httpx.HTTPError as error:
                 if remaining_attempts == 0 or not _is_retryable(error):
+                    if self._cache is not None:
+                        raise
                     raise _provider_error(error) from error
+                await asyncio.sleep(min(2, 0.25 * (self._attempts - remaining_attempts)))
                 continue
-            return _decode_json(response)
+            return response

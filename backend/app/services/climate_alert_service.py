@@ -19,6 +19,8 @@ def evaluate_climate_alerts(
     farm: Farm,
     forecast: WeatherForecastRead,
 ) -> list[Alert]:
+    if forecast.freshness == "historical":
+        raise ValueError("Historical forecasts cannot drive agronomic alerts.")
     alerts: list[Alert] = []
     first_48_hours = forecast.daily[:2]
     if first_48_hours:

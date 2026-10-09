@@ -55,6 +55,9 @@ async def get_farm_forecast(
     service: WeatherService = Depends(get_weather_service),
 ):
     farm = await _get_owned_farm(farm_id, db, current_user)
+    # Release the authorization read connection before nested cache transactions
+    # and provider I/O. An influx of requests must not starve its own DB pool.
+    await db.commit()
     try:
         return await service.forecast(farm, days)
     except WeatherProviderRateLimited as error:

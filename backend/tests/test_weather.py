@@ -414,7 +414,7 @@ class WeatherServiceTests(unittest.IsolatedAsyncioTestCase):
         await started.wait()
         release.set()
         forecasts = await asyncio.gather(*requests)
-        self.assertTrue(all(forecast is forecasts[0] for forecast in forecasts))
+        self.assertTrue(all(forecast == forecasts[0] for forecast in forecasts))
         provider.fetch_forecast.assert_awaited_once()
 
     async def test_refresh_reuses_unchanged_data_and_replaces_changed_data(self):
@@ -426,9 +426,9 @@ class WeatherServiceTests(unittest.IsolatedAsyncioTestCase):
         )
         first = await service.forecast(self.farm, 2)
         now = 10.0
-        self.assertIs(await service.forecast(self.farm, 2), first)
+        self.assertEqual(await service.forecast(self.farm, 2), first)
         now = 19.0
-        self.assertIs(await service.forecast(self.farm, 2), first)
+        self.assertEqual(await service.forecast(self.farm, 2), first)
         self.assertEqual(provider.fetch_forecast.await_count, 2)
         changed = provider_payload()
         changed["current"]["temperature_2m"] = 29
@@ -451,13 +451,13 @@ class WeatherServiceTests(unittest.IsolatedAsyncioTestCase):
         first = await service.forecast(self.farm, 2)
         provider.fetch_forecast.side_effect = WeatherProviderUnavailable("offline")
         now = 10.0
-        self.assertIs(await service.forecast(self.farm, 2), first)
+        self.assertEqual(await service.forecast(self.farm, 2), first)
         now = 14.0
-        self.assertIs(await service.forecast(self.farm, 2), first)
+        self.assertEqual(await service.forecast(self.farm, 2), first)
         self.assertEqual(provider.fetch_forecast.await_count, 2)
         provider.fetch_forecast.side_effect = None
         now = 15.0
-        self.assertIs(await service.forecast(self.farm, 2), first)
+        self.assertEqual(await service.forecast(self.farm, 2), first)
         self.assertEqual(provider.fetch_forecast.await_count, 3)
 
     async def test_failure_without_cached_data_is_also_throttled(self):
@@ -503,7 +503,7 @@ class WeatherServiceTests(unittest.IsolatedAsyncioTestCase):
         invalid_payload["current"]["relative_humidity_2m"] = 200
         provider.fetch_forecast.return_value = invalid_payload
         now = 20.0
-        self.assertIs(await service.forecast(self.farm, 2), forecast)
+        self.assertEqual(await service.forecast(self.farm, 2), forecast)
         now = 61.0
         with self.assertRaises(InvalidWeatherDataError) as raised:
             await service.forecast(self.farm, 2)
@@ -563,7 +563,7 @@ class WeatherServiceTests(unittest.IsolatedAsyncioTestCase):
         first = await service.forecast(self.farm, 2)
         second = await service.forecast(self.farm, 2)
 
-        self.assertIs(second, first)
+        self.assertEqual(second, first)
         provider.fetch_forecast.assert_awaited_once()
 
     async def test_returns_stale_cache_during_provider_failure(self):
@@ -585,7 +585,7 @@ class WeatherServiceTests(unittest.IsolatedAsyncioTestCase):
 
         second = await service.forecast(self.farm, 2)
 
-        self.assertIs(second, first)
+        self.assertEqual(second, first)
 
 
 class WeatherRouterTests(unittest.IsolatedAsyncioTestCase):
