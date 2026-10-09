@@ -78,6 +78,25 @@ requiere una evaluación independiente de las dependencias transitivas y manteni
 
 ## Decisión pendiente
 
+### Revalidación al resolver el conflicto del PR #76
+
+El 2026-10-09T00:30Z (2026-10-08 Guatemala), una consulta APT actualizada en un
+contenedor aislado de la misma base confirmó Candidate=Installed para los 17 binarios
+afectados en Trixie/security/updates. El [índice oficial de backports amd64](https://deb.debian.org/debian/dists/trixie-backports/main/binary-amd64/Packages.xz)
+no contenía ninguno de esos paquetes. Fue una lectura de metadatos para análisis,
+sin instalaciones, mezcla de repositorios ni cambios APT del host.
+
+El escaneo real del runtime con la resolución mantuvo 44 HIGH, cero CRITICAL y
+config=0/image=1/identity=0. Se verificaron UID 10001, CapEff/CapBnd=0,
+NoNewPrivs=1 y fstab sin entradas. mount y nsenter siguen presentes; systemd-homed
+y Archive::Tar siguen ausentes. No se presume que estos controles eliminen los CVE.
+
+Para CVE-2026-78409 existe una discrepancia de alcance: el [advisory upstream](https://github.com/util-linux/util-linux/security/advisories/GHSA-8f2p-47x3-43mv)
+indica afectados >=2.42, mientras [Debian](https://security-tracker.debian.org/tracker/CVE-2026-78409)
+marca Trixie 2.41.5 vulnerable. Requiere aclaración del mantenedor; no se excluyó.
+Los parches upstream 2.41.6 no constituyen una actualización Debian Trixie soportada
+disponible en los repositorios comprobados. Más evidencia en el [informe del conflicto](docker-pr76-merge.md).
+
 Se detiene la remediación de estos ocho CVEs sin instalar paquetes de sid, retirar
 componentes esenciales ni cambiar el gate. Recomendación: mantener el PR **Draft**
 y el gate en **FAIL** hasta disponer de una base corregida o una decisión explícita

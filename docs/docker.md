@@ -6,7 +6,8 @@ El adaptador resuelve la publicación loopback en Docker Desktop 4.55.0. El driv
 de Auth/MFA/persistencia y Alembic pasa, y la base Trixie conserva Python y el lockfile.
 Trivy sigue en FAIL por ocho CVEs Debian (44 HIGH); Android permanece pendiente y
 el CI Docker global falla por ese gate, aunque las pruebas Linux funcionales pasan.
-Consulta [el informe vigente](docker-closeout.md),
+Consulta [la resolución del conflicto y su validación](docker-pr76-merge.md),
+[la entrega Docker inicial](docker-closeout.md),
 [los riesgos pendientes](docker-security-risk-register.md) y
 [la validación inicial](docker-validation.md). Conserva el preflight habilitado.
 
