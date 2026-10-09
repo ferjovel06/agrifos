@@ -27,15 +27,13 @@ class MainShell extends StatefulWidget {
   State<MainShell> createState() => _MainShellState();
 }
 
-class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
+class _MainShellState extends State<MainShell> {
   int _currentIndex = 0;
   Timer? _weatherTimer;
   String? _weatherFarm;
-  bool _foreground = true;
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addObserver(this);
     OfflineRuntime.shared?.network.addListener(_networkChanged);
   }
 
@@ -55,7 +53,7 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
 
   void _activateWeather() {
     _weatherTimer?.cancel();
-    if (!_foreground ||
+    if (OfflineRuntime.shared?.engine.foreground == false ||
         (_currentIndex != 0 && _currentIndex != 2) ||
         _weatherFarm == null) {
       return;
@@ -63,7 +61,7 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
     final farm = _weatherFarm;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted &&
-          _foreground &&
+          OfflineRuntime.shared?.engine.foreground != false &&
           farm != null &&
           farm == _weatherFarm &&
           (_currentIndex == 0 || _currentIndex == 2)) {
@@ -79,16 +77,9 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
   }
 
   @override
-  void didChangeAppLifecycleState(AppLifecycleState state) {
-    _foreground = state == AppLifecycleState.resumed;
-    _activateWeather();
-  }
-
-  @override
   void dispose() {
     _weatherTimer?.cancel();
     OfflineRuntime.shared?.network.removeListener(_networkChanged);
-    WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
 

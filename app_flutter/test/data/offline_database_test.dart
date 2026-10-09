@@ -9,6 +9,52 @@ Future<SecretKey> key(String user) async =>
     SecretKey(List.filled(32, user == 'farmer-a' ? 7 : 8));
 void main() {
   test(
+    'point lookups and active queue avoid loading unrelated history',
+    () async {
+      final db = OfflineDatabase(NativeDatabase.memory(), accountKey: key);
+      await db.putEntity('farmer-a', 'farms', {
+        'id': 'wanted',
+        'name': 'Wanted',
+        'revision': 1,
+      }, 'wanted');
+      await db.putEntity('farmer-a', 'farms', {
+        'id': 'other',
+        'name': 'Other',
+        'revision': 1,
+      }, 'other');
+      expect(
+        (await db.entity('farmer-a', 'farms', 'wanted'))!['name'],
+        'Wanted',
+      );
+      expect(await db.entity('farmer-b', 'farms', 'wanted'), isNull);
+
+      for (final id in ['active', 'history']) {
+        await db.enqueue(
+          'farmer-a',
+          id,
+          'reading-$id',
+          'readings',
+          'create',
+          'wanted',
+          {'parcel_id': 'parcel', 'nitrogen': 25},
+          {'id': 'reading-$id', 'nitrogen': 25},
+          DateTime.utc(2026),
+        );
+      }
+      await db.mark('farmer-a', 'history', 'synced');
+      expect(
+        (await db.operations(
+          'farmer-a',
+          activeOnly: true,
+        )).single['operation_id'],
+        'active',
+      );
+      expect((await db.operation('farmer-a', 'history'))!['status'], 'synced');
+      await db.close();
+    },
+  );
+
+  test(
     'private coordinates are hidden in cache keys as well as encrypted payloads',
     () async {
       final db = OfflineDatabase(NativeDatabase.memory(), accountKey: key);

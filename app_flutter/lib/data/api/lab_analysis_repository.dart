@@ -40,9 +40,11 @@ class LabAnalysisRepository {
   Future<LabAnalysis> update(String id, LabAnalysisInput input) async {
     final runtime = OfflineRuntime.shared;
     if (runtime != null) {
-      final row = (await runtime.read(
+      final row = (await runtime.database.entity(
+        runtime.requireAccount(),
         'lab_analyses',
-      )).where((r) => r['id'] == id).first;
+        id,
+      ))!;
       return LabAnalysis.fromJson(
         await runtime.save(
           'lab_analyses',
@@ -62,9 +64,11 @@ class LabAnalysisRepository {
       if (!runtime.network.operational) {
         throw StateError('La eliminación requiere conexión con el servidor.');
       }
-      final row = (await runtime.read(
+      final row = (await runtime.database.entity(
+        runtime.requireAccount(),
         'lab_analyses',
-      )).where((r) => r['id'] == id).first;
+        id,
+      ))!;
       if (row['_sync_status'] != 'synced') {
         throw StateError(
           'Revisa primero los cambios pendientes de esta muestra.',

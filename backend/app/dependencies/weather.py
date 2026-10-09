@@ -6,16 +6,11 @@ from app.integrations.weather_normalization import MetNorwayNormalizer, OpenMete
 from app.integrations.weather_provider import (
     FallbackWeatherProvider, MetNorwayProvider, OpenMeteoProvider,
 )
-from app.services.weather_service import WeatherForecastCache, WeatherService
+from app.services.weather_service import WeatherService
 from app.services.weather_http_cache import PersistentWeatherHttpCache, PersistentForecastCache
 from app.db.session import AsyncSessionLocal
 
 
-_forecast_cache = WeatherForecastCache(
-    fresh_seconds=settings.WEATHER_CACHE_FRESH_SECONDS,
-    stale_seconds=settings.WEATHER_CACHE_STALE_SECONDS,
-    retry_seconds=settings.WEATHER_CACHE_RETRY_SECONDS,
-)
 _http_cache = PersistentWeatherHttpCache(
     AsyncSessionLocal, fresh_seconds=settings.WEATHER_CACHE_FRESH_SECONDS,
     stale_seconds=settings.WEATHER_CACHE_STALE_SECONDS,
@@ -52,7 +47,5 @@ def get_weather_service() -> WeatherService:
     )
     return WeatherService(
         provider=FallbackWeatherProvider(primary=primary, fallback=fallback),
-        cache=_forecast_cache,
-        persistent=True,
-        persistent_cache=_normalized_cache,
+        cache=_normalized_cache,
     )

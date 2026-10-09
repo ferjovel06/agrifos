@@ -262,7 +262,7 @@ class OfflinePostgresTests(unittest.TestCase):
                         primary=OpenMeteoProvider(transport=transport, normalizer=OpenMeteoNormalizer(), base_url=f"https://fixture.invalid/{namespace}/open"),
                         fallback=MetNorwayProvider(transport=transport, normalizer=MetNorwayNormalizer(), base_url=f"https://fixture.invalid/{namespace}/met", user_agent="Agrifos test https://github.com/ferjovel06/agrifos"))
                     cache = PersistentForecastCache(self.sessions, namespace=namespace, clock=lambda: now)
-                    return WeatherService(provider, persistent=True, persistent_cache=cache)
+                    return WeatherService(provider, cache=cache)
                 farms = [Farm(id=uuid.uuid4(), name=f"Private farm {i}", latitude=12.112345, longitude=-86.223456) for i in range(10)]
                 results = await asyncio.gather(*(service().forecast(farm, 2) for farm in farms))
                 self.assertEqual(calls, {"open":1,"met":1})

@@ -23,7 +23,7 @@ class InvalidWeatherDataError(RuntimeError):
     pass
 
 
-_ForecastKey = tuple[str, float, float, int]
+_ForecastKey = tuple[float, float, int]
 _ForecastLoader = Callable[[], Awaitable[WeatherForecastRead]]
 
 
@@ -151,27 +151,18 @@ class WeatherService:
         self,
         provider: WeatherProvider,
         cache: WeatherForecastCache | None = None,
-        persistent: bool = False,
-        persistent_cache=None,
     ):
         self._provider = provider
         self._cache = cache or _shared_forecast_cache
-        self._persistent = persistent
-        self._persistent_cache = persistent_cache
 
     async def forecast(self, farm: Farm, days: int) -> WeatherForecastRead:
         latitude = math.trunc(farm.latitude * 10000) / 10000
         longitude = math.trunc(farm.longitude * 10000) / 10000
-        cache_key = ("forecast-v1", latitude, longitude, days)
+        cache_key = (latitude, longitude, days)
         neutral = Farm(id=uuid.UUID(int=0), name="", latitude=latitude, longitude=longitude)
-        if self._persistent:
-            forecast = await self._persistent_cache.get_or_load(
-                (latitude, longitude, days), lambda: self._load_forecast(neutral, days),
-            ) if self._persistent_cache is not None else await self._load_forecast(neutral, days)
-        else:
-            forecast = await self._cache.get_or_load(
-                cache_key, lambda: self._load_forecast(neutral, days),
-            )
+        forecast = await self._cache.get_or_load(
+            cache_key, lambda: self._load_forecast(neutral, days),
+        )
         # Private identity is added AFTER retrieving the shared forecast.
         return forecast.model_copy(update={"farm_id": farm.id, "farm_name": farm.name})
 

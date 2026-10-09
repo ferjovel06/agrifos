@@ -105,8 +105,7 @@ class ParcelRepository {
     required DateTime plantingDate,
   }) async {
     final runtime = OfflineRuntime.shared;
-    final account = runtime?.requireAccount();
-    final response = await _client.post('/parcels', {
+    Future<dynamic> request() => _client.post('/parcels', {
       'farm_id': farmId,
       'crop_id': cropId,
       'variety_id': varietyId,
@@ -115,19 +114,9 @@ class ParcelRepository {
       'plants_per_hectare': plantsPerHectare,
       'planting_date': _dateOnly(plantingDate),
     });
-    if (runtime != null) {
-      if (runtime.requireAccount() != account) {
-        throw ApiAuthException('La cuenta cambió.');
-      }
-      final user = account!;
-      await runtime.database.putEntity(
-        user,
-        'parcels',
-        response,
-        response["farm_id"] as String,
-      );
-      await runtime.engine.synchronize();
-    }
+    final response = runtime == null
+        ? await request()
+        : await runtime.storeOnlineEntity('parcels', request);
     return Parcel.fromJson(response);
   }
 
@@ -141,8 +130,7 @@ class ParcelRepository {
     required DateTime plantingDate,
   }) async {
     final runtime = OfflineRuntime.shared;
-    final account = runtime?.requireAccount();
-    final response = await _client.patch('/parcels/$id', {
+    Future<dynamic> request() => _client.patch('/parcels/$id', {
       'crop_id': cropId,
       'variety_id': varietyId,
       'name': name,
@@ -150,19 +138,9 @@ class ParcelRepository {
       'plants_per_hectare': plantsPerHectare,
       'planting_date': _dateOnly(plantingDate),
     });
-    if (runtime != null) {
-      if (runtime.requireAccount() != account) {
-        throw ApiAuthException('La cuenta cambió.');
-      }
-      final user = account!;
-      await runtime.database.putEntity(
-        user,
-        'parcels',
-        response,
-        response["farm_id"] as String,
-      );
-      await runtime.engine.synchronize();
-    }
+    final response = runtime == null
+        ? await request()
+        : await runtime.storeOnlineEntity('parcels', request);
     return Parcel.fromJson(response);
   }
 
@@ -177,8 +155,7 @@ class ParcelRepository {
     required DateTime plantingDate,
   }) async {
     final runtime = OfflineRuntime.shared;
-    final account = runtime?.requireAccount();
-    final response = await _client.patch('/parcels/$id/configuration', {
+    Future<dynamic> request() => _client.patch('/parcels/$id/configuration', {
       'crop_id': cropId,
       'variety_id': varietyId,
       'phenological_stage_template_id': stageTemplateId,
@@ -187,19 +164,9 @@ class ParcelRepository {
       'plants_per_hectare': plantsPerHectare,
       'planting_date': _dateOnly(plantingDate),
     });
-    if (runtime != null) {
-      if (runtime.requireAccount() != account) {
-        throw ApiAuthException('La cuenta cambió.');
-      }
-      final user = account!;
-      await runtime.database.putEntity(
-        user,
-        'parcels',
-        response,
-        response["farm_id"] as String,
-      );
-      await runtime.engine.synchronize();
-    }
+    final response = runtime == null
+        ? await request()
+        : await runtime.storeOnlineEntity('parcels', request);
     return Parcel.fromJson(response);
   }
 

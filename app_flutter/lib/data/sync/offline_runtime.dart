@@ -153,19 +153,6 @@ class OfflineRuntime extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<Map<String, dynamic>?> cachedWeather(String farmId, int days) async {
-    final user = requireAccount();
-    final farm = (await database.entities(
-      user,
-      'farms',
-    )).where((row) => row['id'] == farmId).firstOrNull;
-    if (farm == null) return null;
-    final key = _weatherKey(farm, days);
-    final cached = await database.cache(user, key);
-    if (account != user || cached == null) return null;
-    return _weatherView(cached, farmId);
-  }
-
   String _weatherKey(Map<String, dynamic> farm, int days) {
     double truncate(num value) => (value.toDouble() * 10000).truncate() / 10000;
     return 'weather:v1:${truncate(farm['latitude'] as num)}:${truncate(farm['longitude'] as num)}:$days';
@@ -177,9 +164,7 @@ class OfflineRuntime extends ChangeNotifier {
     Map<String, dynamic>? corrected,
   }) async {
     final user = requireAccount();
-    final op = (await database.operations(
-      user,
-    )).where((row) => row['operation_id'] == operationId).first;
+    final op = (await database.operation(user, operationId))!;
     if (op['status'] != 'conflict' && op['status'] != 'failed_permanent') {
       throw StateError('Esta operación aún está en espera.');
     }
@@ -220,8 +205,11 @@ class OfflineRuntime extends ChangeNotifier {
         throw StateError('Revisa la muestra antes de reenviarla.');
       }
       _validate('lab_analyses', corrected);
-      final rows = await database.entities(user, 'lab_analyses');
-      final local = rows.where((row) => row['id'] == op['entity_id']).first;
+      final local = (await database.entity(
+        user,
+        'lab_analyses',
+        op['entity_id'] as String,
+      ))!;
       final expected = remote is Map
           ? remote['revision'] as int?
           : op['expected_revision'] as int?;
@@ -292,6 +280,34 @@ class OfflineRuntime extends ChangeNotifier {
     return data;
   }
 
+  Future<Map<String, dynamic>> storeOnlineEntity(
+    String kind,
+    Future<dynamic> Function() request,
+  ) async {
+    final user = requireAccount();
+    final response = await request() as Map<String, dynamic>;
+    if (account != user) throw ApiAuthException('La cuenta cambió.');
+    await database.putEntity(
+      user,
+      kind,
+      response,
+      response[kind == 'farms' ? 'id' : 'farm_id'] as String,
+    );
+    await engine.synchronize();
+    return response;
+  }
+
+  Future<dynamic> storeOnlineCache(
+    String key,
+    Future<dynamic> Function() request,
+  ) async {
+    final user = requireAccount();
+    final response = await request();
+    if (account != user) throw ApiAuthException('La cuenta cambió.');
+    await database.putCache(user, key, response as Object, clock());
+    return response;
+  }
+
   Future<Map<String, dynamic>> save(
     String kind,
     String parcelId,
@@ -303,19 +319,13 @@ class OfflineRuntime extends ChangeNotifier {
       throw ApiAuthException('Esta cuenta tiene acceso de solo lectura.');
     }
     _validate(kind, payload);
-    final parcel = (await database.entities(
-      user,
-      'parcels',
-    )).where((p) => p['id'] == parcelId).firstOrNull;
+    final parcel = await database.entity(user, 'parcels', parcelId);
     if (parcel == null) {
       throw StateError('Descarga la parcela antes de registrar una muestra.');
     }
     Map<String, dynamic>? previous;
     if (id != null) {
-      previous = (await database.entities(
-        user,
-        kind,
-      )).where((row) => row['id'] == id).firstOrNull;
+      previous = await database.entity(user, kind, id);
       if (previous == null || previous['parcel_id'] != parcelId) {
         throw StateError('La muestra no está disponible en esta parcela.');
       }
@@ -425,33 +435,30 @@ class OfflineRuntime extends ChangeNotifier {
     bool manual = false,
   }) async {
     final user = requireAccount();
-    final farm = (await database.entities(
-      user,
-      'farms',
-    )).where((f) => f['id'] == farmId).firstOrNull;
+    final farm = await database.entity(user, 'farms', farmId);
     if (farm == null) {
       throw StateError('Descarga la finca antes de consultar su clima.');
     }
     final key = _weatherKey(farm, days);
     final cached = await database.cache(user, key);
     if (account != user) throw ApiAuthException('La cuenta cambió.');
-    final attempted = await database.cache(user, '$key:attempt');
-    if (!manual &&
-        cached == null &&
-        attempted != null &&
-        clock().difference(attempted['checked_at'] as DateTime) <
-            const Duration(minutes: 15)) {
-      throw ApiException(
-        0,
-        'El pronóstico no está disponible. Espera antes de volver a consultar.',
-      );
-    }
     if (cached != null &&
         (!manual &&
                 clock().difference(cached['checked_at'] as DateTime) <
                     const Duration(minutes: 15) ||
             !network.operational)) {
       return _weatherView(cached, farmId);
+    }
+    if (cached == null && !manual) {
+      final attempted = await database.cache(user, '$key:attempt');
+      if (attempted != null &&
+          clock().difference(attempted['checked_at'] as DateTime) <
+              const Duration(minutes: 15)) {
+        throw ApiException(
+          0,
+          'El pronóstico no está disponible. Espera antes de volver a consultar.',
+        );
+      }
     }
     if (!network.operational) {
       if (cached != null) return _weatherView(cached, farmId);

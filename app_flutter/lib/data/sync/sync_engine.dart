@@ -55,10 +55,10 @@ class SyncEngine extends ChangeNotifier {
   Future<void> reload() async {
     final user = account;
     if (user == null) return;
-    final ops = await database.operations(user);
+    final ops = await database.operations(user, activeOnly: true);
     final last = await database.lastSync(user);
     if (!_same(user)) return;
-    pending = ops.where((op) => op['status'] != 'synced').toList();
+    pending = ops;
     syncedAt = last;
     revision++;
     notifyListeners();
@@ -152,14 +152,16 @@ class SyncEngine extends ChangeNotifier {
     String path,
     String user, {
     Map<String, String>? query,
-  }) async {
+  }) => _withRefresh(user, () => client.get(path, query: query));
+
+  Future<T> _withRefresh<T>(String user, Future<T> Function() request) async {
     try {
-      return await client.get(path, query: query);
+      return await request();
     } on ApiException catch (e) {
       if (e.statusCode != 401 || !await refreshSession() || !_same(user)) {
         rethrow;
       }
-      return client.get(path, query: query);
+      return request();
     }
   }
 
@@ -178,30 +180,26 @@ class SyncEngine extends ChangeNotifier {
         'expected_revision': op['expected_revision'],
         'payload': op['payload'],
       };
-      Map<String, dynamic> response;
-      try {
-        response = await client.postForUser('/sync/operations', body, user);
-      } on ApiException catch (e) {
-        if (e.statusCode != 401 || !await refreshSession() || !_same(user)) {
-          rethrow;
-        }
-        response = await client.postForUser('/sync/operations', body, user);
-      }
+      final response = await _withRefresh(
+        user,
+        () => client.postForUser('/sync/operations', body, user),
+      );
       if (!_same(user)) {
         return; // Restart recovery replays this same operation ID.
       }
       final confirmed = response['data'];
       if (confirmed is! Map<String, dynamic> ||
           confirmed['id'] != op['entity_id'] ||
-          confirmed['revision'] is! int || (confirmed['revision'] as int) < 1 ||
-          (response['operation_id'] != null && response['operation_id'] != id)) {
-        throw ApiException(502, 'No se recibió una confirmación válida del cambio.');
+          confirmed['revision'] is! int ||
+          (confirmed['revision'] as int) < 1 ||
+          (response['operation_id'] != null &&
+              response['operation_id'] != id)) {
+        throw ApiException(
+          502,
+          'No se recibió una confirmación válida del cambio.',
+        );
       }
-      await database.acknowledge(
-        user,
-        op,
-        confirmed,
-      );
+      await database.acknowledge(user, op, confirmed);
     } on ApiAuthException {
       await database.mark(user, id, 'pending', error: 'session_required');
       sessionPaused = true;

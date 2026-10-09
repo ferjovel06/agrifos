@@ -52,8 +52,9 @@ async def measure(args):
                 provider = FallbackWeatherProvider(
                     primary=OpenMeteoProvider(transport=transport, normalizer=OpenMeteoNormalizer(), base_url=f"https://fixture.invalid/{namespace}/open"),
                     fallback=MetNorwayProvider(transport=transport, normalizer=MetNorwayNormalizer(), base_url=f"https://fixture.invalid/{namespace}/met", user_agent="Agrifos test https://github.com/ferjovel06/agrifos"))
-                options = {"persistent":True,"persistent_cache":PersistentForecastCache(sessions, namespace=namespace)} if args.persistent else {}
-                return WeatherService(provider, cache=WeatherForecastCache(), **options)
+                cache = (PersistentForecastCache(sessions, namespace=namespace)
+                         if args.persistent else WeatherForecastCache())
+                return WeatherService(provider, cache=cache)
             farms = [Farm(id=uuid.uuid4(),name="Fixture",latitude=12.112345,longitude=-86.223456) for _ in range(10)]
             results = await asyncio.gather(*(service().forecast(farm, 2) for farm in farms))
             assert len(results) == 10

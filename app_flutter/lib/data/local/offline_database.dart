@@ -130,17 +130,31 @@ class OfflineDatabase extends GeneratedDatabase {
       '${farm == null ? '' : ' AND farm=?'}${parent == null ? '' : ' AND parent=?'} ORDER BY id',
       [account, kind, ?farm, ?parent],
     );
-    return Future.wait(
-      result.map(
-        (row) async => {
-          ...await decrypt(account, '$kind:${row['id']}', row['data'] as String)
-              as Map<String, dynamic>,
-          '_sync_status': row['dirty'] == 1 ? 'pending' : 'synced',
-          'revision': row['revision'],
-        },
-      ),
-    );
+    return Future.wait(result.map((row) => _decodeEntity(account, kind, row)));
   }
+
+  Future<Map<String, dynamic>?> entity(
+    String account,
+    String kind,
+    String id,
+  ) async {
+    final result = await rows(
+      'SELECT * FROM entities WHERE account=? AND kind=? AND id=?',
+      [account, kind, id],
+    );
+    return result.isEmpty ? null : _decodeEntity(account, kind, result.single);
+  }
+
+  Future<Map<String, dynamic>> _decodeEntity(
+    String account,
+    String kind,
+    Map<String, dynamic> row,
+  ) async => {
+    ...await decrypt(account, '$kind:${row['id']}', row['data'] as String)
+        as Map<String, dynamic>,
+    '_sync_status': row['dirty'] == 1 ? 'pending' : 'synced',
+    'revision': row['revision'],
+  };
 
   Future<void> putEntity(
     String account,
@@ -223,33 +237,44 @@ class OfflineDatabase extends GeneratedDatabase {
   Future<List<Map<String, dynamic>>> operations(
     String account, {
     bool dueOnly = false,
+    bool activeOnly = false,
     DateTime? now,
   }) async {
     final records = await rows(
       'SELECT * FROM outbox WHERE account=?'
       '${dueOnly ? " AND status IN ('pending','retry_wait') AND (next_attempt IS NULL OR next_attempt<=?)" : ''}'
+      '${activeOnly ? " AND status != 'synced'" : ''}'
       ' ORDER BY created_at,operation_id',
       [account, if (dueOnly) now!.millisecondsSinceEpoch],
     );
-    return Future.wait(
-      records.map(
-        (row) async => {
-          ...row,
-          'payload': await decrypt(
-            account,
-            'operation:${row['operation_id']}',
-            row['payload'] as String,
-          ),
-          if (row['remote'] != null)
-            'remote': await decrypt(
-              account,
-              'remote:${row['operation_id']}',
-              row['remote'] as String,
-            ),
-        },
-      ),
-    );
+    return Future.wait(records.map((row) => _decodeOperation(account, row)));
   }
+
+  Future<Map<String, dynamic>?> operation(String account, String id) async {
+    final result = await rows(
+      'SELECT * FROM outbox WHERE account=? AND operation_id=?',
+      [account, id],
+    );
+    return result.isEmpty ? null : _decodeOperation(account, result.single);
+  }
+
+  Future<Map<String, dynamic>> _decodeOperation(
+    String account,
+    Map<String, dynamic> row,
+  ) async => {
+    ...row,
+    'payload': await decrypt(
+      account,
+      'operation:${row['operation_id']}',
+      row['payload'] as String,
+    ),
+    if (row['remote'] != null)
+      'remote': await decrypt(
+        account,
+        'remote:${row['operation_id']}',
+        row['remote'] as String,
+      ),
+  };
 
   Future<void> recover(String account) => customStatement(
     "UPDATE outbox SET status='pending' WHERE account=? AND status='in_progress'",

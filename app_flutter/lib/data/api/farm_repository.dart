@@ -27,26 +27,15 @@ class FarmRepository {
     required double longitude,
   }) async {
     final runtime = OfflineRuntime.shared;
-    final account = runtime?.requireAccount();
-    final response = await _client.post('/farms', {
+    Future<dynamic> request() => _client.post('/farms', {
       'name': name,
       'area_hectares': areaHectares,
       'latitude': latitude,
       'longitude': longitude,
     });
-    if (runtime != null) {
-      if (runtime.requireAccount() != account) {
-        throw ApiAuthException('La cuenta cambió.');
-      }
-      final user = account!;
-      await runtime.database.putEntity(
-        user,
-        'farms',
-        response,
-        response["id"] as String,
-      );
-      await runtime.engine.synchronize();
-    }
+    final response = runtime == null
+        ? await request()
+        : await runtime.storeOnlineEntity('farms', request);
     return Farm.fromJson(response);
   }
 
@@ -58,26 +47,15 @@ class FarmRepository {
     required double longitude,
   }) async {
     final runtime = OfflineRuntime.shared;
-    final account = runtime?.requireAccount();
-    final response = await _client.patch('/farms/$id', {
+    Future<dynamic> request() => _client.patch('/farms/$id', {
       'name': name,
       'area_hectares': areaHectares,
       'latitude': latitude,
       'longitude': longitude,
     });
-    if (runtime != null) {
-      if (runtime.requireAccount() != account) {
-        throw ApiAuthException('La cuenta cambió.');
-      }
-      final user = account!;
-      await runtime.database.putEntity(
-        user,
-        'farms',
-        response,
-        response["id"] as String,
-      );
-      await runtime.engine.synchronize();
-    }
+    final response = runtime == null
+        ? await request()
+        : await runtime.storeOnlineEntity('farms', request);
     return Farm.fromJson(response);
   }
 }

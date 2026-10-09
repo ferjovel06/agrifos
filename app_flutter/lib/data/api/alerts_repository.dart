@@ -11,30 +11,21 @@ class AlertsRepository {
     bool evaluate = false,
   }) async {
     final runtime = OfflineRuntime.shared;
-    final account = runtime?.requireAccount();
     if (runtime != null && !runtime.network.operational) {
       final response = await runtime.cachedGet('/alerts/farms/$farmId') as List;
       return response
           .map((item) => ClimateAlert.fromJson(item as Map<String, dynamic>))
           .toList();
     }
-    final dynamic response = evaluate
+    Future<dynamic> request() async => evaluate
         ? (await _client.post(
             '/alerts/farms/$farmId/evaluate',
             {},
           ))['active_alerts']
-        : await _client.get('/alerts/farms/$farmId');
-    if (runtime != null) {
-      if (runtime.requireAccount() != account) {
-        throw ApiAuthException('La cuenta cambió.');
-      }
-      await runtime.database.putCache(
-        account!,
-        '/alerts/farms/$farmId:{}',
-        response as Object,
-        runtime.clock(),
-      );
-    }
+        : _client.get('/alerts/farms/$farmId');
+    final response = runtime == null
+        ? await request()
+        : await runtime.storeOnlineCache('/alerts/farms/$farmId:{}', request);
     return (response as List)
         .map((item) => ClimateAlert.fromJson(item as Map<String, dynamic>))
         .toList();

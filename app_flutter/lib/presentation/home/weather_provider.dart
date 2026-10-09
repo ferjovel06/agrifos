@@ -1,6 +1,5 @@
 import 'package:flutter/foundation.dart';
 import '../../data/api/weather_repository.dart';
-import '../../data/sync/offline_runtime.dart';
 import '../../domain/entities/weather_forecast.dart';
 
 enum WeatherStatus { initial, loading, loaded, error }
@@ -39,9 +38,6 @@ class WeatherProvider extends ChangeNotifier {
   Future<void> _fetch(String farmId, bool force, int generation) async {
     if (forecast?.farmId != farmId) forecast = null;
     try {
-      final cached = await OfflineRuntime.shared?.cachedWeather(farmId, 7);
-      if (generation != _generation) return;
-      if (cached != null) forecast = WeatherForecast.fromJson(cached);
       status = forecast == null ? WeatherStatus.loading : WeatherStatus.loaded;
       errorMessage = null;
       notifyListeners();

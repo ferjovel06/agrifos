@@ -49,17 +49,22 @@ class _SyncReviewScreenState extends State<SyncReviewScreen> {
   }
 
   Future<void> _edit(Map<String, dynamic> op) async {
-    final records = await runtime.read('lab_analyses');
-    final row = records
-        .where((row) => row['id'] == op['entity_id'])
-        .firstOrNull;
+    final row = await runtime.database.entity(
+      account!,
+      'lab_analyses',
+      op['entity_id'] as String,
+    );
     if (!mounted || runtime.account != account || row == null) return;
     await Navigator.of(context).push(
       MaterialPageRoute<bool>(
         builder: (_) => LabAnalysisFormScreen(
           parcelId: row['parcel_id'] as String,
           analysis: LabAnalysis.fromJson(row),
-          repository: _ReviewRepository(runtime, op['operation_id'] as String),
+          repository: LabAnalysisRepository(),
+          onUpdate: (_, input) => runtime.resolve(
+            op['operation_id'] as String,
+            corrected: input.toJson(),
+          ),
         ),
       ),
     );
@@ -184,17 +189,4 @@ class _SyncReviewScreenState extends State<SyncReviewScreen> {
       );
     },
   );
-}
-
-class _ReviewRepository extends LabAnalysisRepository {
-  _ReviewRepository(this.runtime, this.operation);
-  final OfflineRuntime runtime;
-  final String operation;
-  @override
-  Future<LabAnalysis> update(String id, LabAnalysisInput input) async {
-    await runtime.resolve(operation, corrected: input.toJson());
-    return LabAnalysis.fromJson(
-      (await runtime.read('lab_analyses')).firstWhere((row) => row['id'] == id),
-    );
-  }
 }

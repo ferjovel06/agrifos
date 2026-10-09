@@ -41,26 +41,31 @@ class FertilizationRepository {
       'fruit_stage': fruitStage,
     }..removeWhere((_, value) => value == null);
     final runtime = OfflineRuntime.shared;
-    final account = runtime?.requireAccount();
     if (runtime != null) {
-      if (!runtime.network.operational) throw ApiException(0, 'Necesitas conexión para calcular un plan nuevo.');
+      if (!runtime.network.operational) {
+        throw ApiException(
+          0,
+          'Necesitas conexión para calcular un plan nuevo.',
+        );
+      }
       final rows = await runtime.read('lab_analyses', parent: parcelId);
-      if (rows.any((row) => row['id'] == labAnalysisId && row['_sync_status'] != 'synced')) {
-        throw ApiException(409, 'Sincroniza o revisa la muestra antes de calcular un plan.');
+      if (rows.any(
+        (row) => row['id'] == labAnalysisId && row['_sync_status'] != 'synced',
+      )) {
+        throw ApiException(
+          409,
+          'Sincroniza o revisa la muestra antes de calcular un plan.',
+        );
       }
     }
-    final response = await _client.post('/fertilization/recommendations', body);
-    if (runtime != null) {
-      if (runtime.requireAccount() != account) {
-        throw ApiAuthException('La cuenta cambió.');
-      }
-      await runtime.database.putCache(
-        account!,
-        '/fertilization/plans/latest:{"parcel_id":"$parcelId","include_organic":"true"}',
-        response,
-        runtime.clock(),
-      );
-    }
+    Future<dynamic> request() =>
+        _client.post('/fertilization/recommendations', body);
+    final response = runtime == null
+        ? await request()
+        : await runtime.storeOnlineCache(
+            '/fertilization/plans/latest:{"parcel_id":"$parcelId","include_organic":"true"}',
+            request,
+          );
     return FertilizationRecommendation.fromJson(response);
   }
 
@@ -99,28 +104,33 @@ class FertilizationRepository {
       'soil': soil,
     }..removeWhere((_, value) => value == null);
     final runtime = OfflineRuntime.shared;
-    final account = runtime?.requireAccount();
     if (runtime != null) {
-      if (!runtime.network.operational) throw ApiException(0, 'Necesitas conexión para calcular un plan nuevo.');
+      if (!runtime.network.operational) {
+        throw ApiException(
+          0,
+          'Necesitas conexión para calcular un plan nuevo.',
+        );
+      }
       if (readingId != null) {
         final rows = await runtime.read('readings', parent: parcelId);
-        if (rows.any((row) => row['id'] == readingId && row['_sync_status'] != 'synced')) {
-          throw ApiException(409, 'Sincroniza o revisa la lectura antes de calcular un plan.');
+        if (rows.any(
+          (row) => row['id'] == readingId && row['_sync_status'] != 'synced',
+        )) {
+          throw ApiException(
+            409,
+            'Sincroniza o revisa la lectura antes de calcular un plan.',
+          );
         }
       }
     }
-    final response = await _client.post('/fertilization/recommendations', body);
-    if (runtime != null) {
-      if (runtime.requireAccount() != account) {
-        throw ApiAuthException('La cuenta cambió.');
-      }
-      await runtime.database.putCache(
-        account!,
-        '/fertilization/plans/latest:{"parcel_id":"$parcelId","include_organic":"true"}',
-        response,
-        runtime.clock(),
-      );
-    }
+    Future<dynamic> request() =>
+        _client.post('/fertilization/recommendations', body);
+    final response = runtime == null
+        ? await request()
+        : await runtime.storeOnlineCache(
+            '/fertilization/plans/latest:{"parcel_id":"$parcelId","include_organic":"true"}',
+            request,
+          );
     return FertilizationRecommendation.fromJson(response);
   }
 }
