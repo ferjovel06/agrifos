@@ -305,7 +305,9 @@ void main() {
         final auth = repository(
           (request) => request.url.path == '/auth/login'
               ? jsonResponse(challenge)
-              : jsonResponse({'detail': 'Verificación rechazada.'}, status),
+              : jsonResponse({
+                  'detail': 'El código no es válido o ya fue utilizado.',
+                }, status),
         );
         final provider = AuthProvider(auth);
         addTearDown(provider.dispose);
@@ -315,7 +317,12 @@ void main() {
         );
         expect(await provider.verifyMfa('123456'), false);
         expect(provider.status, AuthStatus.mfaRequired);
-        expect(provider.errorMessage, 'Verificación rechazada.');
+        expect(
+          provider.errorMessage,
+          status >= 500
+              ? 'El servicio no está disponible en este momento. Intenta de nuevo más tarde.'
+              : 'El código no es válido o ya fue utilizado.',
+        );
         expect(auth.accessToken, isNull);
         expect(auth.currentUser, isNull);
       },

@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 import '../../core/env.dart';
+import 'api_error_message.dart';
 
 /// Thrown when the backend returns a non-2xx response.
 class ApiException implements Exception {
@@ -70,7 +71,7 @@ class ApiClient {
     final response = await _send(
       _http.post(_uri(path), headers: headers, body: jsonEncode(body)),
     );
-    return _decode(response) ?? <String, dynamic>{};
+    return _decodeObject(response);
   }
 
   Future<dynamic> get(String path, {Map<String, String>? query}) async {
@@ -88,7 +89,7 @@ class ApiClient {
     final response = await _send(
       _http.patch(_uri(path), headers: headers, body: jsonEncode(body)),
     );
-    return _decode(response) as Map<String, dynamic>;
+    return _decodeObject(response);
   }
 
   Future<void> delete(String path) async {
@@ -116,18 +117,38 @@ class ApiClient {
   dynamic _decode(http.Response response) {
     if (response.statusCode >= 200 && response.statusCode < 300) {
       if (response.body.isEmpty) return null;
-      return jsonDecode(utf8.decode(response.bodyBytes));
+      try {
+        return jsonDecode(utf8.decode(response.bodyBytes));
+      } on FormatException {
+        throw ApiException(
+          response.statusCode,
+          'No se pudo interpretar la respuesta del servidor. Intenta nuevamente.',
+        );
+      }
     }
 
-    String message = 'Error del servidor (${response.statusCode}).';
+    Object? detail;
     try {
       final decoded = jsonDecode(utf8.decode(response.bodyBytes));
       if (decoded is Map && decoded['detail'] != null) {
-        message = decoded['detail'].toString();
+        detail = decoded['detail'];
       }
     } catch (_) {
       // response body wasn't JSON, keep the default message
     }
-    throw ApiException(response.statusCode, message);
+    throw ApiException(
+      response.statusCode,
+      apiErrorMessage(response.statusCode, detail),
+    );
+  }
+
+  Map<String, dynamic> _decodeObject(http.Response response) {
+    final decoded = _decode(response);
+    if (decoded == null) return <String, dynamic>{};
+    if (decoded is Map<String, dynamic>) return decoded;
+    throw ApiException(
+      response.statusCode,
+      'No se pudo interpretar la respuesta del servidor. Intenta nuevamente.',
+    );
   }
 }

@@ -47,7 +47,7 @@ class LatestReadingProvider extends ChangeNotifier {
       notifyListeners();
     } catch (e) {
       status = LatestReadingStatus.error;
-      errorMessage = 'No se pudo cargar la última lectura: $e';
+      errorMessage = 'No se pudo cargar la última lectura. Intenta nuevamente.';
       notifyListeners();
     }
   }

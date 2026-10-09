@@ -99,7 +99,7 @@ class FarmProvider extends ChangeNotifier {
       notifyListeners();
     } catch (e) {
       status = FarmStatus.error;
-      errorMessage = 'No se pudieron cargar tus fincas: $e';
+      errorMessage = 'No se pudieron cargar tus fincas. Intenta nuevamente.';
       notifyListeners();
     }
   }
@@ -137,7 +137,7 @@ class FarmProvider extends ChangeNotifier {
       notifyListeners();
       return false;
     } catch (e) {
-      errorMessage = 'No se pudo registrar la finca: $e';
+      errorMessage = 'No se pudo registrar la finca. Intenta nuevamente.';
       notifyListeners();
       return false;
     }

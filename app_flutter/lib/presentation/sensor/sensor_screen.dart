@@ -538,8 +538,7 @@ class _SensorScreenState extends State<SensorScreen> {
             ),
             const SizedBox(height: 16),
             ConventionalFertilizationCard(
-              scenario:
-                  _fertilizationRecommendation?.diagnosticSummaryScenario,
+              scenario: _fertilizationRecommendation?.diagnosticSummaryScenario,
               application:
                   _fertilizationRecommendation?.nextYoungCropApplication,
               isLoading: _isLoadingFertilization,
@@ -701,7 +700,7 @@ class _SensorScreenState extends State<SensorScreen> {
       setState(() {
         _isLoadingFertilization = false;
         _fertilizationError =
-            'No se pudo conectar con el motor de fertilización: $error';
+            'No se pudo obtener el plan de fertilización. Intenta nuevamente.';
       });
     }
   }

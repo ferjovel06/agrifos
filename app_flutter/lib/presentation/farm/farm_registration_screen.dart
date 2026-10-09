@@ -294,7 +294,7 @@ class _FarmRegistrationScreenState extends State<FarmRegistrationScreen> {
       setState(() => _isSubmitting = false);
       _showError(
         _createdParcelId == null
-            ? 'No se pudo registrar la parcela: $error'
+            ? 'No se pudo registrar la parcela. Revisa los datos e intenta nuevamente.'
             : 'La parcela fue registrada, pero falta guardar su etapa. Reintenta.',
       );
     }
