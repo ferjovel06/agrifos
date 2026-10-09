@@ -174,7 +174,12 @@ WEATHER_TIMEOUT_SECONDS=15
 WEATHER_CONNECT_TIMEOUT_SECONDS=5
 WEATHER_REQUEST_ATTEMPTS=2
 WEATHER_FALLBACK_REQUEST_ATTEMPTS=1
+WEATHER_CACHE_FRESH_SECONDS=1800
+WEATHER_CACHE_STALE_SECONDS=21600
+WEATHER_CACHE_RETRY_SECONDS=60
 ```
+
+La caché meteorológica se comparte entre solicitudes dentro de cada proceso del backend. Conserva el pronóstico vigente durante `WEATHER_CACHE_FRESH_SECONDS` y agrupa consultas simultáneas para la misma finca, coordenadas y cantidad de días. Al vencer, consulta al proveedor; si los datos son iguales, reutiliza el pronóstico y renueva su vigencia. Ante un fallo, espera `WEATHER_CACHE_RETRY_SECONDS` antes de reintentar y puede servir el último pronóstico hasta `WEATHER_CACHE_STALE_SECONDS` desde su última consulta exitosa. La caché se pierde al reiniciar y no se comparte entre workers.
 
 App Flutter (`app_flutter/.env`):
 
@@ -530,7 +535,7 @@ Las referencias bibliográficas no equivalen a validación local de dosis. Los p
 
 `POST /fertilization/recommendations` acepta `include_organic: true`; `GET /fertilization/plans/latest` admite la misma capacidad como parámetro. El valor predeterminado es `false`, para conservar el comportamiento de consumidores anteriores. Flutter solicita esta capacidad.
 
-Orgánico muestra Bocashi, Biol y Compost de pulpa de café, cantidades de referencia y un balance de composición total. No constituye una receta aprobada: disponibilidad temporal desconocida, `can_apply: false`, sin calendario ejecutable. Los sólidos usan kg/ha (y equivalencia en t/ha); el biol usa L/ha, sin convertir litros a kg por una densidad supuesta. Véase [implementación orgánica](docs/IMPLEMENTACION_ORGANICA_LOCAL.md).
+Orgánico muestra Bocashi, Biol y Compost de pulpa de café, cantidades de referencia y un balance de composición total. No constituye una receta aprobada: disponibilidad temporal desconocida, `can_apply: false`, sin calendario ejecutable. Los sólidos usan kg/ha (y equivalencia en t/ha); el biol usa L/ha, sin convertir litros a kg por una densidad supuesta.
 
 ## Documentación mantenida
 

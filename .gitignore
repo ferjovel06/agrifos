@@ -36,3 +36,8 @@ artifacts/
 supabase/.local/
 docker/**/__pycache__/
 docker/**/*.pyc
+
+# Local development demos and previews
+/backend/tools/
+/app_flutter/tool/
+/app_flutter/web/

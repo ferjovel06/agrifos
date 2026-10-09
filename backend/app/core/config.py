@@ -16,6 +16,9 @@ class Settings(BaseSettings):
     WEATHER_CONNECT_TIMEOUT_SECONDS: float = Field(default=5.0, gt=0)
     WEATHER_REQUEST_ATTEMPTS: int = Field(default=2, ge=1)
     WEATHER_FALLBACK_REQUEST_ATTEMPTS: int = Field(default=1, ge=1)
+    WEATHER_CACHE_FRESH_SECONDS: float = Field(default=1800, gt=0)
+    WEATHER_CACHE_STALE_SECONDS: float = Field(default=21600, gt=0)
+    WEATHER_CACHE_RETRY_SECONDS: float = Field(default=60, gt=0)
     WEATHER_API_BASE_URL: str = "https://api.open-meteo.com/v1"
     WEATHER_FALLBACK_API_BASE_URL: str = (
         "https://api.met.no/weatherapi/locationforecast/2.0"

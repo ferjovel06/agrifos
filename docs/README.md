@@ -7,7 +7,6 @@ Revisión sincronizada con `main` (`f986ccb`, PR #74), 8 de octubre de 2026.
 | [README del proyecto](../README.md) | Presentación, configuración y ejecución |
 | [Estado implementado](ESTADO_IMPLEMENTADO.md) | Capacidades, límites y fuentes de verdad |
 | [Motor](agrifos_engine_documentation.md) | Contrato, cálculo, unidades y persistencia |
-| [Orgánico](IMPLEMENTACION_ORGANICA_LOCAL.md) | Perfiles, balance, compatibilidad e historial de validación |
 | [Guía de evaluación](guia_evaluador.md) | Recorrido API y aplicación |
 | [Arquitectura](diagrams/architecture_diagram.mmd) | Componentes y conexiones implementadas |
 | [Actividad](diagrams/activity_diagram.mmd) | Generación y recuperación de planes |

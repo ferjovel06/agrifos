@@ -71,8 +71,10 @@ class WeatherAndAuthConfigurationTests(unittest.TestCase):
         self.assertEqual(settings.supabase_jwks_url, "http://127.0.0.1:54321/auth/v1/.well-known/jwks.json")
         self.assertEqual(
             (settings.WEATHER_TIMEOUT_SECONDS, settings.WEATHER_CONNECT_TIMEOUT_SECONDS,
-             settings.WEATHER_REQUEST_ATTEMPTS, settings.WEATHER_FALLBACK_REQUEST_ATTEMPTS),
-            (15.0, 5.0, 2, 1),
+             settings.WEATHER_REQUEST_ATTEMPTS, settings.WEATHER_FALLBACK_REQUEST_ATTEMPTS,
+             settings.WEATHER_CACHE_FRESH_SECONDS, settings.WEATHER_CACHE_STALE_SECONDS,
+             settings.WEATHER_CACHE_RETRY_SECONDS),
+            (15.0, 5.0, 2, 1, 1800, 21600, 60),
         )
 
     def test_internal_jwks_coexists_with_custom_weather_policy(self):
@@ -83,19 +85,26 @@ class WeatherAndAuthConfigurationTests(unittest.TestCase):
             WEATHER_CONNECT_TIMEOUT_SECONDS=6.0,
             WEATHER_REQUEST_ATTEMPTS=4,
             WEATHER_FALLBACK_REQUEST_ATTEMPTS=2,
+            WEATHER_CACHE_FRESH_SECONDS=900,
+            WEATHER_CACHE_STALE_SECONDS=7200,
+            WEATHER_CACHE_RETRY_SECONDS=45,
         )
 
         self.assertEqual(settings.supabase_jwks_url, internal_url)
         self.assertEqual(settings.SUPABASE_URL, "http://127.0.0.1:54321")
         self.assertEqual(
             (settings.WEATHER_TIMEOUT_SECONDS, settings.WEATHER_CONNECT_TIMEOUT_SECONDS,
-             settings.WEATHER_REQUEST_ATTEMPTS, settings.WEATHER_FALLBACK_REQUEST_ATTEMPTS),
-            (31.0, 6.0, 4, 2),
+             settings.WEATHER_REQUEST_ATTEMPTS, settings.WEATHER_FALLBACK_REQUEST_ATTEMPTS,
+             settings.WEATHER_CACHE_FRESH_SECONDS, settings.WEATHER_CACHE_STALE_SECONDS,
+             settings.WEATHER_CACHE_RETRY_SECONDS),
+            (31.0, 6.0, 4, 2, 900, 7200, 45),
         )
 
     def test_invalid_weather_limits_are_rejected_with_internal_jwks(self):
         for name in ("WEATHER_TIMEOUT_SECONDS", "WEATHER_CONNECT_TIMEOUT_SECONDS",
-                     "WEATHER_REQUEST_ATTEMPTS", "WEATHER_FALLBACK_REQUEST_ATTEMPTS"):
+                     "WEATHER_REQUEST_ATTEMPTS", "WEATHER_FALLBACK_REQUEST_ATTEMPTS",
+                     "WEATHER_CACHE_FRESH_SECONDS", "WEATHER_CACHE_STALE_SECONDS",
+                     "WEATHER_CACHE_RETRY_SECONDS"):
             for value in (0, -1):
                 with self.subTest(setting=name, value=value):
                     with self.assertRaises(ValidationError) as raised:
