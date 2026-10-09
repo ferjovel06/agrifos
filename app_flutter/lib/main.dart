@@ -29,7 +29,11 @@ import 'presentation/sensor/sensor_provider.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await dotenv.load(fileName: '.env');
-  final vault = SecureVault('agrifos:${Uri.parse(Env.supabaseUrl).host}');
+  final namespace = const Uuid().v5(
+    Namespace.url.value,
+    '${Env.apiBaseUrl}:${Env.supabaseUrl}',
+  );
+  final vault = SecureVault('agrifos:$namespace');
 
   await Supabase.initialize(
     url: Env.supabaseUrl,
@@ -45,10 +49,6 @@ Future<void> main() async {
   );
   if (!kIsWeb) {
     final support = await getApplicationSupportDirectory();
-    final namespace = const Uuid().v5(
-      Namespace.url.value,
-      '${Env.apiBaseUrl}:${Env.supabaseUrl}',
-    );
     final db = OfflineDatabase.file(
       '${support.path}/offline-$namespace.sqlite',
       accountKey: vault.key,
