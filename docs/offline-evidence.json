@@ -201,6 +201,86 @@
       "file": "tmp/offline/secret-scan.log",
       "sha256": "eef1023f1261d64fbfbb70052f9ebd75f4f9cfa2ed4b449abd396e48ebc16583",
       "bytes": 270
+    },
+    {
+      "file": "tmp/offline/backend-final-delivery.log",
+      "sha256": "ff51d25033d9e0dddcc0ac648c9fbf27aebdb6d1bfb051a7a7c9eb54c04fca4b",
+      "bytes": 1666
+    },
+    {
+      "file": "tmp/offline/flutter-final-full.log",
+      "sha256": "1dde543fc511dd0ff02020e9947e4b4072c9a1962835775b4e5d4f86aada8db3",
+      "bytes": 17762
+    },
+    {
+      "file": "tmp/offline/flutter-web-final-corrected.log",
+      "sha256": "8fbb70269b415423b31ac906fb5b70eb4f440e35a1eff520ed3a97e0767c9679",
+      "bytes": 6044
+    },
+    {
+      "file": "tmp/offline/secret-scan-final.log",
+      "sha256": "129a3a5bccb830d4ea1a099eccb4647f44ea8d6a404911bc0013d95150c3f182",
+      "bytes": 267
+    },
+    {
+      "file": "tmp/offline/secret-scan-final.json",
+      "sha256": "cc2e0fd32b43d2671042bc44098965bad8468d1833b7628d6348b34e255fa776",
+      "bytes": 81005
+    },
+    {
+      "file": "tmp/offline/github-ci-37887839569.log",
+      "sha256": "5f35efdf887c513a03480c59ebfe71ae132497f5f8d646e935237c436362bc2e",
+      "bytes": 117658
+    },
+    {
+      "file": "tmp/offline/ci-37887839609/offline-acceptance-results/ci-postgres.log",
+      "sha256": "8f792f0301daf76c21a5b07770efdeb23a1d4805a02d90739bfa6638724d38c3",
+      "bytes": 2941
+    },
+    {
+      "file": "tmp/offline/ci-37887839609/offline-acceptance-results/ci-integration.log",
+      "sha256": "39486db3a6db95ccafd00df31c06dc3bf123637e264751eb4831d69e00d275ad",
+      "bytes": 3142
+    },
+    {
+      "file": "tmp/offline/ci-37887839609/offline-acceptance-results/real-integration.json",
+      "sha256": "f9e6b432cb0e4f119effbfb6f63b0e4cfff59e9f8cd0d16b8339a0733823f10f",
+      "bytes": 315
     }
-  ]
+  ],
+  "secret_scan": {
+    "status": "PASS",
+    "findings": 0,
+    "scanner": "Trivy 0.75.0 secret",
+    "snapshot": "9b86aa5be0eb99c1c9820853127a6c1d762b0251"
+  },
+  "web_isolated_build": {
+    "status": "PASS",
+    "source_head": "9b86aa5",
+    "native_runtime_acceptance": false
+  },
+  "pull_request": {
+    "number": 82,
+    "url": "https://github.com/ferjovel06/agrifos/pull/82",
+    "draft": true,
+    "base": "main"
+  },
+  "ci": {
+    "validated_head": "9b86aa5be0eb99c1c9820853127a6c1d762b0251",
+    "base_at_pr_creation": "08ade9e2b4b55213f6ca571c22d252a7741b8e29",
+    "original_ci": {
+      "status": "PASS",
+      "url": "https://github.com/ferjovel06/agrifos/actions/runs/37887839569",
+      "backend_passed": 136,
+      "backend_skipped": 7,
+      "flutter_passed": 116,
+      "flutter_skipped": 1
+    },
+    "real_integration_ci": {
+      "status": "PASS",
+      "url": "https://github.com/ferjovel06/agrifos/actions/runs/37887839609",
+      "postgres_tests_passed": 7,
+      "three_layer_test_passed": 1
+    }
+  }
 }

@@ -116,7 +116,10 @@ La fixture Auth crea esquema/usuarios/factores de prueba y emite JWT ES256
 verificados mediante JWKS real en loopback. Su archivo temporal con token queda
 en `.dart_tool`, se elimina al terminar y jamás se sube como artifact. Los artifacts
 CI son únicamente logs sanitizados y `real-integration.json`. Los logs locales
-están ignorados; el JSON versionado conserva hashes y resultados, no secretos.
+están ignorados; el JSON versionado conserva hashes y resultados, no secretos. Las últimas suites
+son `backend-final-delivery.log` (143) y `flutter-final-full.log` (116);
+`flutter-web-final-corrected.log` confirma compilación aislada del código final
+y `secret-scan-final.json` registra cero secretos en el snapshot 9b86aa5.
 
 ## Compatibilidad y limitaciones
 
@@ -143,12 +146,29 @@ están ignorados; el JSON versionado conserva hashes y resultados, no secretos.
 
 ## Git, CI y entrega
 
-Rama de destino de revisión: `main`; se autoriza publicar solamente esta nueva
-rama y un **Draft PR**. El resultado remoto de CI se incorporará tras crearlo.
+Publicado el **[Draft PR #82](https://github.com/ferjovel06/agrifos/pull/82)**
+hacia `main`. No se fusionó ni desplegó.
+
+CI del head **9b86aa5**, completado en GitHub Ubuntu:
+
+- **PASS [CI](https://github.com/ferjovel06/agrifos/actions/runs/37887839569)**:
+  Backend tests (136 PASS + 7 SKIP por falta de fixture en este job) y Flutter
+  checks (116 PASS + 1 SKIP de integración; analyze sin problemas).
+- **PASS [Offline integration](https://github.com/ferjovel06/agrifos/actions/runs/37887839609)**:
+  las siete pruebas PostgreSQL omitidas en el job genérico pasan aquí, más el
+  driver real SQLite→HTTP→PostgreSQL. Artifact `offline-acceptance-results`
+  conserva logs y JSON sanitizados. No se sustituyó esa integración por mocks.
+
+La base auditada es 8182f9f. Durante la entrega `main` avanzó a **08ade9e** por
+PR #81 (solamente `compose.yaml` y nuevo `deploy/nginx/default.conf`). Esta rama
+no modifica esos archivos ni importa cambios Docker. GitHub indica que #82 es
+mergeable; los checks validan la propuesta contra la base actual. No se hizo
+rebase/merge ni se tocó `main` local. El cierre documental posterior conserva
+el mismo código validado; cada push vuelve a ejecutar los tres jobs.
 Los workflows originales se conservan; se añade la aceptación real en Ubuntu
 con PostgreSQL 17 y Flutter 3.44.9. No se editaron workflows Docker.
 
-Commits de implementación antes del cierre documental:
+Commits de implementación y cierre documental:
 
 ```text
 7db000e docs(offline): audit existing field workflows and weather requests
@@ -163,6 +183,7 @@ f2ea058 fix(offline): guard late responses and require confirmed agronomic input
 fbf4bbf fix(storage): isolate secure grants and keys by backend environment
 e283dca fix(storage): conceal private query coordinates in cache keys
 9738fbe test(sync): reconnect multiple persisted operations over real HTTP
+9b86aa5 docs(offline): record architecture acceptance evidence and operating limits
 ```
 
 ## Archivos modificados
@@ -261,3 +282,10 @@ docs/offline-validation.md
 scripts/offline_integration.py
 scripts/weather_call_benchmark.py
 ```
+
+
+Recursos de prueba locales: contenedores propios `agrifos-offline-tools-01` y
+`agrifos-offline-pg-02`, PostgreSQL publicado exclusivamente en 127.0.0.1:64288;
+volumen propio `agrifos-offline-pg-01`. No son requisitos de la arquitectura,
+sino tooling/fixtures de esta validación. Se preservan datos y evidencia; no se
+eliminan volúmenes ni recursos preexistentes.
