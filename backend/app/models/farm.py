@@ -4,10 +4,10 @@ from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
-from app.models.mixins import UUIDPKMixin, TimestampMixin
+from app.models.mixins import RevisionMixin, UUIDPKMixin, TimestampMixin
 
 
-class Farm(Base, UUIDPKMixin, TimestampMixin):
+class Farm(Base, RevisionMixin, UUIDPKMixin, TimestampMixin):
     __tablename__ = "farms"
 
     user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), nullable=False)
@@ -24,7 +24,7 @@ class Farm(Base, UUIDPKMixin, TimestampMixin):
     productions: Mapped[list["Production"]] = relationship(back_populates="farm")
 
 
-class Parcel(Base, UUIDPKMixin, TimestampMixin):
+class Parcel(Base, RevisionMixin, UUIDPKMixin, TimestampMixin):
     __tablename__ = "parcels"
 
     farm_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("farms.id"), nullable=False)
