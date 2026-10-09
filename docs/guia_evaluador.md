@@ -1,23 +1,23 @@
 # Guía de evaluación de Ágrifos
 
-Base documental: `main` en `f986ccb` (PR #74), 8 de octubre de 2026. La versión del despliegue y del APK se comprueba durante la evaluación; no se presume actualizada por un merge.
+Base documental: `main` en `e28cf2b` (PR #86), 9 de octubre de 2026. La versión del despliegue y del APK se comprueba durante la evaluación; no se presume actualizada por un merge.
 
-Esta guía permite activar la API desplegada, probar sus endpoints protegidos e instalar la aplicación Android.
+Esta guía permite verificar la API desplegada en Azure, probar sus endpoints protegidos e instalar la aplicación Android.
 
-## 1. Activar y verificar el backend
+## 1. Verificar el backend en Azure
 
-Ágrifos está desplegado en Render. En el plan gratuito, el servicio puede suspenderse después de un periodo sin tráfico, por lo que la primera solicitud puede tardar algunos segundos.
+Ágrifos está desplegado en una VM de Azure con HTTPS válido. Caddy termina HTTPS y dirige el tráfico a Nginx; Nginx conecta con FastAPI. La API y PostgreSQL se ejecutan en contenedores aislados. El monitoreo local comprueba su disponibilidad cada dos minutos.
 
-1. Abra la [portada de Ágrifos API](https://agrifos-api.onrender.com/).
+1. Abra la [portada de Ágrifos API](https://agrifos-api.northcentralus.cloudapp.azure.com/).
 2. Espere hasta que la portada indique que el servicio está disponible.
 3. Presione **Abrir Swagger UI** para consultar y probar los endpoints.
 
 También puede abrir directamente los recursos técnicos:
 
-- [Swagger UI](https://agrifos-api.onrender.com/docs): documentación interactiva.
-- [ReDoc](https://agrifos-api.onrender.com/redoc): referencia legible de la API.
-- [API Health](https://agrifos-api.onrender.com/health): disponibilidad y versión del backend.
-- [Database Health](https://agrifos-api.onrender.com/health/db): conexión y latencia de PostgreSQL.
+- [Swagger UI](https://agrifos-api.northcentralus.cloudapp.azure.com/docs): documentación interactiva.
+- [ReDoc](https://agrifos-api.northcentralus.cloudapp.azure.com/redoc): referencia legible de la API.
+- [API Health](https://agrifos-api.northcentralus.cloudapp.azure.com/health): disponibilidad y versión del backend.
+- [Database Health](https://agrifos-api.northcentralus.cloudapp.azure.com/health/db): conexión y latencia de PostgreSQL.
 
 Una respuesta correcta de `/health` tiene esta estructura:
 
@@ -43,7 +43,7 @@ Una respuesta correcta de `/health/db` tiene esta estructura:
 
 ## 2. Autorización para probar endpoints
 
-Los endpoints requieren un access token válido emitido por Supabase Auth. La portada, `/health`, `/health/db`, `/docs`, `/redoc` y `/openapi.json` son públicos.
+Los endpoints de negocio requieren un access token JWT válido emitido por la autenticación nativa de FastAPI (`AUTH_PROVIDER=native`). Los endpoints públicos de registro, login y recuperación se describen en Swagger. La portada, `/health`, `/health/db`, `/docs`, `/redoc` y `/openapi.json` son públicos.
 
 En Swagger UI:
 
@@ -54,25 +54,27 @@ En Swagger UI:
 
 ### Obtener un token de prueba
 
-Con las credenciales proporcionadas por el equipo, puede iniciar sesión y obtener un token. Sustituya también `<SUPABASE_PUBLISHABLE_KEY>` por la clave publicable entregada junto con las credenciales.
+Utilice una cuenta confirmada y las credenciales proporcionadas por el equipo por un canal privado. En Swagger, abra `POST /auth/login` y envíe:
 
-En Bash, Git Bash, Linux o macOS:
-
-```bash
-curl --request POST \
-  'https://nquoibsuhgbomlbsljvs.supabase.co/auth/v1/token?grant_type=password' \
-  --header 'apikey: <SUPABASE_PUBLISHABLE_KEY>' \
-  --header 'Content-Type: application/json' \
-  --data '{"email":"<CORREO_DE_PRUEBA>","password":"<CONTRASEÑA_DE_PRUEBA>"}'
+```json
+{
+  "email": "<CORREO_DE_PRUEBA>",
+  "password": "<CONTRASEÑA_DE_PRUEBA>"
+}
 ```
 
-En Windows PowerShell:
+Si la cuenta no tiene MFA activo, la respuesta contiene `access_token`, `token_type` y `expires_in`. Si tiene MFA, la respuesta contiene `mfa_required: true`, `challenge_id` y `expires_in`; todavía no hay una sesión autorizada. Abra `POST /auth/mfa/verify` y envíe:
 
-```powershell
-(Invoke-RestMethod -Method Post -Uri 'https://nquoibsuhgbomlbsljvs.supabase.co/auth/v1/token?grant_type=password' -Headers @{apikey='<SUPABASE_PUBLISHABLE_KEY>'} -ContentType 'application/json' -Body (@{email='<CORREO_DE_PRUEBA>';password='<CONTRASEÑA_DE_PRUEBA>'} | ConvertTo-Json)).access_token
+```json
+{
+  "challenge_id": "<CHALLENGE_ID_DEL_LOGIN>",
+  "code": "<CODIGO_TOTP_DE_6_DIGITOS>"
+}
 ```
 
-Los tokens expiran. Si Swagger responde `401`, inicie sesión nuevamente y sustituya el token. Las credenciales y los tokens de evaluación se comparten por un canal privado y no deben publicarse en el repositorio, las notas del release ni capturas de pantalla. La clave debe ser la **publishable key** de Supabase; nunca se debe compartir una secret key o la clave `service_role`.
+Copie el `access_token` devuelto y complete **Authorize**. Conserve el código como texto para mantener ceros iniciales. Los JWT y los desafíos expiran: ante `401`, repita el login y, si corresponde, la verificación TOTP. No use un token de Supabase para esta entrega.
+
+Para registrar una cuenta, use la app o `POST /auth/register` con `name`, `email` y `password`, y complete la confirmación de correo. El registro no emite un token de sesión. Confirmación y recuperación dependen de la configuración SMTP del servidor; si no llega el correo, compruebe esa integración antes de considerar validado el flujo. Credenciales, contraseñas, tokens y secretos TOTP no deben publicarse en el repositorio ni en capturas.
 
 ## 3. Roles disponibles
 
@@ -84,7 +86,7 @@ Los tokens expiran. Si Swagger responde `401`, inicie sesión nuevamente y susti
 
 Para evaluar el flujo completo, se recomienda crear una cuenta nueva desde la aplicación. Toda cuenta recién registrada recibe automáticamente el rol `farmer`, por lo que el evaluador podrá registrar sus propias fincas y parcelas, completar el resto del recorrido y probar en la API las operaciones `POST`, `PUT`, `PATCH` y `DELETE` con sus propios datos.
 
-La cuenta `auditor` proporcionada está destinada a comprobar el acceso global de solo lectura. Permite consultar datos mediante operaciones `GET`, pero no crear ni modificar registros: las solicitudes `POST`, `PUT`, `PATCH` y `DELETE` deben responder HTTP `403`.
+Si el equipo proporciona una cuenta `auditor`, está destinada a comprobar el acceso global de solo lectura. Permite consultar datos mediante operaciones `GET`, pero no crear ni modificar registros: las solicitudes `POST`, `PUT`, `PATCH` y `DELETE` deben responder HTTP `403`.
 
 Los roles `auditor` y `admin` deben asignarse previamente por un administrador; el usuario no puede elevar su propio rol desde la aplicación.
 
@@ -116,11 +118,20 @@ Para comprobar los permisos, una cuenta `auditor` puede repetir consultas `GET`;
 
 ## 5. Instalar y probar el APK
 
-1. Abra [GitHub Releases de Ágrifos](https://github.com/ferjovel06/agrifos/releases).
-2. Seleccione la prerelease más reciente y descargue el archivo `.apk` incluido en **Assets**.
+1. Obtenga el APK de release de esta entrega del equipo o de [GitHub Releases de Ágrifos](https://github.com/ferjovel06/agrifos/releases), si ya fue publicado.
+2. Confirme que ese APK se compiló para la API de Azure y autenticación `native`. La última prerelease publicada al revisar esta guía es de septiembre de 2026; no presuponga que contiene la actualización de Azure.
 3. En el dispositivo Android, permita temporalmente la instalación desde la aplicación usada para descargar el archivo.
 4. Instale el APK y abra Ágrifos.
 5. Cree una cuenta nueva para probar el flujo completo como `farmer`, o inicie sesión con la cuenta `auditor` proporcionada si solo desea comprobar las consultas de lectura.
+
+Para compilar el APK desde el proyecto, configure `app_flutter/.env` con valores públicos y `app_flutter/android/key.properties` con el keystore de release. Desde `app_flutter/`:
+
+```bash
+flutter pub get
+flutter build apk --release --target-platform android-arm64 --dart-define=AUTH_PROVIDER=native --dart-define=API_BASE_URL=https://agrifos-api.northcentralus.cloudapp.azure.com
+```
+
+El resultado está en `app_flutter/build/app/outputs/flutter-apk/app-release.apk`. Este comando está dirigido a dispositivos ARM64; ajuste la arquitectura para otros dispositivos. Mantenga el mismo keystore para actualizar una instalación existente. La copia instalada durante las pruebas usa firma de desarrollo para preservar los datos; para la entrega final pruebe el APK con firma de release en un dispositivo compatible. Android rechaza actualizar una app con una firma distinta.
 
 Recorrido móvil sugerido:
 
@@ -137,8 +148,10 @@ Recorrido móvil sugerido:
 
 ## 6. Consideraciones para la evaluación
 
-- Se necesita conexión a internet para Supabase Auth, Render y PostgreSQL.
-- La primera llamada al backend puede ser más lenta mientras Render reactiva el servicio.
+- Se necesita conexión a internet para acceder a la API de Azure. La app no se conecta directamente a PostgreSQL; lo hace FastAPI.
+- CORS no restringe al cliente Android/iOS nativo. Si se añade un cliente web, configure sus orígenes por separado.
+- Los secretos de JWT, MFA, PostgreSQL y SMTP permanecen en el servidor; el `.env` empaquetado en el APK solo contiene configuración pública.
+- Compruebe sin conexión que la app muestra mensajes amigables y permite reintentar; al vencer la sesión, debe volver al login.
 - El sensor físico es opcional para revisar el resto del flujo; los análisis de laboratorio pueden ingresarse manualmente.
 - Las credenciales de evaluación son temporales y deben utilizarse únicamente para revisar esta entrega.
 
@@ -150,4 +163,4 @@ Recorrido móvil sugerido:
 - Confirmar que Ca/Mg/S del laboratorio no se presentan como dosis complementarias calculadas. La base fusionada mantiene el balance productivo NPK.
 - Verificar con otra cuenta que no puede consultar o modificar fincas ajenas salvo permisos globales de lectura aplicables. Mantener los casos de auditor sin escritura.
 
-Una demo con fixtures no valida conexión a Supabase, captura de sensor físico ni eficacia agronómica.
+Una demo con fixtures no valida conexión real a Azure o a los proveedores de clima, envío de correo, captura de sensor físico ni eficacia agronómica.

@@ -2,7 +2,7 @@
 
 # 🌱 Ágrifos — Sistema de Asistencia Agrícola Inteligente
 
-Documentación sincronizada el 8 de octubre de 2026 con `main` en `f986ccb` (PR #74). Alcance inicial: café; plataforma escalable a otros cultivos. Véase el [estado implementado](docs/ESTADO_IMPLEMENTADO.md).
+Documentación actualizada el 9 de octubre de 2026 sobre `main` en `e28cf2b` (PR #86). Alcance inicial: café; plataforma escalable a otros cultivos. El commit del servidor y el del APK se verifican por separado durante la entrega.
 
 Sistema de asistencia agrícola compuesto por una plataforma digital interactiva que combina dos fuentes de datos del suelo: un **sensor de suelo genérico 7 en 1 conectado vía cable OTG** y la **captura manual de análisis de laboratorio**. A través de la aplicación móvil, el agricultor registra su finca y perfila sus parcelas seleccionando el tipo de planta y su etapa de crecimiento. Al conectar el sensor mediante cable OTG, la aplicación despliega un tablero de control en tiempo real con los niveles de NPK, conductividad eléctrica, pH, temperatura y humedad; alternativamente, el agricultor puede introducir manualmente los resultados de un análisis de laboratorio para una planificación de fertilización más completa.
 
@@ -20,6 +20,7 @@ Sistema de asistencia agrícola compuesto por una plataforma digital interactiva
 - [Variables de entorno](#variables-de-entorno)
 - [Estructura modular](#estructura-modular)
 - [Scripts](#scripts)
+- [Despliegue y monitoreo en Azure](#despliegue-y-monitoreo-en-azure)
 - [Ejemplos de endpoints](#ejemplos-de-endpoints)
 - [Referencias](#referencias)
 
@@ -29,13 +30,13 @@ La arquitectura implementada está en [architecture_diagram.mmd](docs/diagrams/a
 
 **Flujo de datos**
 1. **Sensor de suelo genérico 7 en 1 (OTG):** dispositivo comercial de sonda multiparamétrica (NPK, CE, pH, temperatura, humedad) que se conecta al teléfono/tablet mediante cable OTG (USB Serial/CDC).
-2. **App (Flutter):** detecta el sensor conectado por OTG, permite capturar análisis de laboratorio y consume la API REST. Supabase Auth gestiona registro, confirmación de correo, sesiones, recuperación de contraseña y MFA TOTP. Planificación incluye calendario mensual/semanal por finca, pronóstico de 7 días y alertas climáticas. Finanzas permite gestionar ingresos y egresos y consultar métricas por finca desde la API.
-3. **Backend (FastAPI):** valida los JWT de Supabase, aplica permisos por rol, persiste la información en PostgreSQL y expone los servicios de diagnóstico, fertilización, fenología y clima. El router `/finances` está publicado y aplica autorización por finca.
+2. **App (Flutter):** detecta el sensor conectado por OTG, permite capturar análisis de laboratorio y consume la API REST. La autenticación nativa de FastAPI gestiona registro, confirmación de correo, sesiones JWT, recuperación de contraseña y MFA TOTP en el despliegue de Azure. Planificación incluye calendario mensual/semanal por finca, pronóstico de 7 días y alertas climáticas. Finanzas permite gestionar ingresos y egresos y consultar métricas por finca desde la API.
+3. **Backend (FastAPI):** emite y valida los JWT nativos, aplica permisos por rol, persiste la información en PostgreSQL y expone los servicios de diagnóstico, fertilización, fenología y clima. El router `/finances` está publicado y aplica autorización por finca.
 4. **Servicio externo de clima:** proveedor meteorológico de terceros consultado por el backend para generar alertas predictivas (lluvias, canículas, olas de calor).
-5. **Base de datos (PostgreSQL):** modelo relacional de 27 entidades de aplicación y la referencia externa a `auth.users`, incluidas referencias agronómicas versionadas, etapas fenológicas normalizadas y recomendaciones de fertilización persistidas — ver [Modelo de datos](#modelo-de-datos) para el detalle completo.
+5. **Base de datos (PostgreSQL):** modelo relacional con usuarios, credenciales nativas, factores y desafíos MFA, tokens de correo y entidades agronómicas, incluidas referencias agronómicas versionadas, etapas fenológicas normalizadas y recomendaciones de fertilización persistidas — ver [Modelo de datos](#modelo-de-datos) para el detalle completo.
 
 ## Modelo de datos
-El diagrama ER completo del modelo (27 entidades de aplicación + `auth.users`, 42 relaciones) está versionado en [`docs/diagrams/er_diagrams/agrifos_er_diagram.mmd`](docs/diagrams/er_diagrams/agrifos_er_diagram.mmd) (formato [Mermaid](https://mermaid.live)). También se divide en vistas por módulo para facilitar su lectura:
+El diagrama ER agronómico está versionado en [`docs/diagrams/er_diagrams/agrifos_er_diagram.mmd`](docs/diagrams/er_diagrams/agrifos_er_diagram.mmd) (formato [Mermaid](https://mermaid.live)). La referencia a `auth.users` corresponde al modo compatible con Supabase; las entidades nativas `AuthCredential`, `AuthEmailToken`, `AuthMfaChallenge` y `AuthMfaFactor` están definidas en `backend/app/models/`. El diagrama se divide en vistas por módulo para facilitar su lectura:
 
 - [Estructura de finca](docs/diagrams/er_diagrams/er_core_farm.mmd)
 - [Datos de suelo](docs/diagrams/er_diagrams/er_soil_data.mmd)
@@ -49,7 +50,7 @@ El diagrama ER completo del modelo (27 entidades de aplicación + `auth.users`, 
 
 | Grupo | Entidades |
 |---|---|
-| Usuarios y estructura de finca | `AuthUser` (referencia externa Supabase), `User`, `Farm`, `Parcel`, `Crop`, `Variety` |
+| Usuarios y estructura de finca | `User`, `AuthCredential`, `AuthEmailToken`, `AuthMfaChallenge`, `AuthMfaFactor`, `AuthUser` (compatibilidad Supabase), `Farm`, `Parcel`, `Crop`, `Variety` |
 | Datos de suelo | `Reading` (sensor OTG), `LabAnalysis` (laboratorio) |
 | Fenología | `PhenologicalStageTemplate` define el ciclo estándar y las etapas reutilizables de cada cultivo; `ParcelPhenologicalStage` registra las fechas estimadas y reales de cada parcela |
 | Referencias agronómicas versionadas | `AgronomicReferenceSet`, `SoilReferenceRange`, `FertilizerProduct`, `FertilizerProductNutrient`, `ApplicationScheduleRule`, `AgronomicParameter`, `OptimalRequirement`, `ExtractionIndex`, `VarietyFactor`, `StageFactor`, `SoilType`, `EfficiencyFactor` |
@@ -99,7 +100,7 @@ Los detalles completos del motor agronómico se distribuyen en los documentos de
 | [`agrifos_engine_documentation.md`](docs/agrifos_engine_documentation.md) | Ecuaciones y límites del motor implementado, escenarios minerales, evaluación orgánica y relación con clima |
 | [`coffee_phenology_and_fertilization_engine.pdf`](docs/coffee_phenology_and_fertilization_engine.pdf) | Referencia agronómica de diseño; contrastar su alcance con el estado implementado |
 | [`coffee_soil_laboratory_parameters.pdf`](docs/coffee_soil_laboratory_parameters.pdf) | Referencia de rangos y métodos; el catálogo no implica dosificación de todos los nutrientes |
-| [`guia_evaluador.md`](docs/guia_evaluador.md) | Instrucciones para activar el backend en Render, probar endpoints protegidos e instalar el APK |
+| [`guia_evaluador.md`](docs/guia_evaluador.md) | Instrucciones para verificar la API en Azure, probar endpoints protegidos e instalar el APK |
 
 ## Motor de Cálculo
 
@@ -125,7 +126,7 @@ Las ecuaciones, factores, supuestos, ejemplos y referencias se documentan en [`d
 | `asyncpg` | Driver asíncrono de PostgreSQL |
 | `alembic` | Migraciones de base de datos |
 | `pydantic` / `pydantic-settings` | Validación de datos y configuración |
-| `pyjwt[crypto]` | Validación de JWT emitidos por Supabase Auth (JWKS/ES256) |
+| `pyjwt[crypto]` | Emisión y validación de JWT nativos; compatibilidad con Supabase (JWKS/ES256) |
 | `httpx` | Cliente HTTP para consumir el proveedor externo de clima |
 | `psycopg2-binary` | Driver PostgreSQL usado por Alembic |
 
@@ -133,8 +134,8 @@ Las ecuaciones, factores, supuestos, ejemplos y referencias se documentan en [`d
 
 | Paquete | Uso |
 |---|---|
-| `supabase_flutter` | Cliente de Supabase Auth (login, registro, recuperación de contraseña, persistencia de sesión) |
-| `flutter_dotenv` | Carga de `SUPABASE_URL` / `SUPABASE_PUBLISHABLE_KEY` desde `.env` |
+| `supabase_flutter` | Cliente del modo alternativo `AUTH_PROVIDER=supabase`; Azure utiliza `native` |
+| `flutter_dotenv` | Carga de configuración pública de la app desde `.env` |
 | `http` | Cliente HTTP para consumir la API de FastAPI |
 | `provider` | Gestión de estado |
 | `flutter_svg` | Renderizado del isotipo/logotipo de la marca |
@@ -151,20 +152,26 @@ Backend (`backend/.env`):
 
 ```env
 # Environment
-ENV=development                 # development | staging | production
-APP_DEBUG=true
+ENV=production                  # development | staging | production
+APP_DEBUG=false
 
 # Database
-DATABASE_URL=postgresql+asyncpg://postgres:example_password@127.0.0.1:54322/postgres
+DATABASE_URL=postgresql+asyncpg://postgres:REPLACE_WITH_PRIVATE_PASSWORD@db:5432/agrifos
 
 DB_POOL_SIZE=10
 DB_POOL_RECYCLE_SECONDS=300
 
-# Supabase
-SUPABASE_URL=https://[project-ref].supabase.co
+# Native authentication
+AUTH_PROVIDER=native
+AUTH_JWT_SECRET=REPLACE_WITH_PRIVATE_SECRET_AT_LEAST_32_BYTES
+AUTH_MFA_ENCRYPTION_KEY=REPLACE_WITH_PRIVATE_FERNET_KEY
+AUTH_EMAIL_REDIRECT_URL=dev.agrifos.agrifos://auth-callback/
 
-# CORS
-ALLOWED_ORIGINS=http://localhost:3000,http://localhost:8080
+# Required by current Settings; not used for native login
+SUPABASE_URL=https://example.supabase.co
+
+# Native mobile clients do not require CORS
+ALLOWED_ORIGINS=
 
 # Weather providers
 WEATHER_API_BASE_URL=https://api.open-meteo.com/v1
@@ -184,10 +191,13 @@ La caché meteorológica se comparte entre solicitudes dentro de cada proceso de
 App Flutter (`app_flutter/.env`):
 
 ```env
-SUPABASE_URL=https://[project-ref].supabase.co
-SUPABASE_PUBLISHABLE_KEY=sb_publishable_xxxxxxxxxxxxx
-API_BASE_URL=https://agrifos-api.onrender.com
+AUTH_PROVIDER=native
+API_BASE_URL=https://agrifos-api.northcentralus.cloudapp.azure.com
+AUTH_REDIRECT_URL=dev.agrifos.agrifos://auth-callback/
+AUTH_PASSWORD_MIN_LENGTH=12
 ```
+
+Las claves JWT, la clave Fernet, las credenciales de PostgreSQL y las de SMTP permanecen en archivos privados del servidor; nunca se incluyen en el APK. Configure `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURITY`, `SMTP_USERNAME`, `SMTP_PASSWORD` y `SMTP_FROM` para confirmación de correo y recuperación de contraseña. El `.env` de Flutter se empaqueta como recurso público. El modo alternativo `supabase` requiere su URL y clave publicable, pero no se usa para el login de Azure.
 
 ## Estructura modular
 
@@ -198,7 +208,7 @@ agrifos/
 │   │   ├── main.py                 # Punto de entrada FastAPI
 │   │   ├── core/
 │   │   │   ├── config.py           # Carga de variables de entorno (Pydantic Settings)
-│   │   │   └── auth.py             # Validación de JWT de Supabase (get_current_user, require_role)
+│   │   │   └── auth.py             # Validación de JWT nativos/compatibles y permisos por rol
 │   │   ├── models/                 # User, Farm, Parcel, Crop, Variety, PhenologicalStageTemplate,
 │   │   │                           # ParcelPhenologicalStage,
 │   │   │                           # Reading, LabAnalysis, OptimalRequirement, ExtractionIndex,
@@ -304,24 +314,47 @@ flutter pub get
 flutter run
 
 # Compilar APK de release
-flutter build apk --release
+flutter build apk --release --target-platform android-arm64 --dart-define=AUTH_PROVIDER=native --dart-define=API_BASE_URL=https://agrifos-api.northcentralus.cloudapp.azure.com
 
-# Compilar para web
-flutter build web
+# El APK anterior está dirigido a dispositivos ARM64.
+# Para otras arquitecturas, ajuste --target-platform o compile por ABI.
 
 # Ejecutar pruebas
 flutter test
 ```
 
+## Despliegue y monitoreo en Azure
+
+El despliegue verificado en `agrifos-api-vm` utiliza Ubuntu 24.04 y el usuario estándar `agrifos`; el acceso SSH de root está deshabilitado. El tráfico sigue `HTTPS → Caddy → Nginx → FastAPI`. API y PostgreSQL corren en Docker sin publicar puertos al exterior; Nginx solo publica `127.0.0.1:8080`, y Caddy expone 80/443.
+
+La base reproducible de contenedores está en `compose.yaml` y `compose.production.yaml`. Prepare un archivo privado de Compose a partir de `deploy/.env.example` y otro para la API a partir de `deploy/backend.env.example`. En ambos configure `AUTH_PROVIDER=native`, `AUTH_JWT_SECRET` y `AUTH_MFA_ENCRYPTION_KEY`, porque Compose sobrescribe estos valores del archivo de la API. Complete las credenciales de base de datos y la configuración SMTP; no ejecute los ejemplos con sus marcadores de posición. La configuración adicional de Caddy de la VM no está incluida en esos dos archivos.
+
+```bash
+# Validar la base de contenedores con el archivo privado de Compose
+# Sustituya la ruta por la ubicación real del archivo del servidor.
+docker compose --env-file /ruta/privada/compose.env -f compose.yaml -f compose.production.yaml config --quiet
+
+# Comprobar disponibilidad desde Nginx y estado de los contenedores
+curl --fail http://127.0.0.1:8080/health
+curl --fail http://127.0.0.1:8080/health/db
+docker ps
+
+# Monitoreo instalado en la VM
+systemctl status agrifos-health.timer
+journalctl -u agrifos-health.service -n 20 --no-pager
+```
+
+`deploy/check-health.sh` y las unidades de `deploy/systemd/` comprueban la API, PostgreSQL, disco y memoria cada dos minutos. El timer está habilitado y el servicio se ejecuta como `agrifos`. Una unidad de tipo `oneshot` puede aparecer inactiva después de una comprobación exitosa; verifique `Result=success` y los últimos registros. Compare el commit y la imagen desplegados con `main`: la versión pública `1.0.0-beta.3` por sí sola no identifica el código exacto.
+
 ## Ejemplos de endpoints
 
-Base URL desplegada: `https://agrifos-api.onrender.com`. La especificación completa y ejecutable está en [Swagger UI](https://agrifos-api.onrender.com/docs).
+Base URL desplegada: `https://agrifos-api.northcentralus.cloudapp.azure.com`. La especificación completa y ejecutable está en [Swagger UI](https://agrifos-api.northcentralus.cloudapp.azure.com/docs).
 
 Los objetos de respuesta mostrados son abreviados para facilitar la lectura; Swagger contiene el contrato completo.
 
 ### Autenticación
 
-El registro e inicio de sesión ocurren directamente contra **Supabase Auth** (ver [supabase.com/docs/guides/auth](https://supabase.com/docs/guides/auth)).
+En Azure, `POST /auth/register` registra la cuenta y `POST /auth/login` recibe `email` y `password`. Si MFA está activo, el login devuelve `mfa_required`, `challenge_id` y `expires_in`; `POST /auth/mfa/verify` recibe `challenge_id` y `code` para emitir el JWT. Sin MFA, el login devuelve directamente `access_token`. Véase la [guía del evaluador](docs/guia_evaluador.md) para los pasos completos.
 
 ### Registrar una finca
 
@@ -512,6 +545,6 @@ Orgánico muestra Bocashi, Biol y Compost de pulpa de café, cantidades de refer
 ## Documentación mantenida
 
 - [Índice y fuentes de verdad](docs/README.md).
-- [Estado de módulos y límites](docs/ESTADO_IMPLEMENTADO.md).
+- [Guía del evaluador y conexión a Azure](docs/guia_evaluador.md).
 - [Arquitectura](docs/diagrams/architecture_diagram.mmd) y [actividad de fertilización](docs/diagrams/activity_diagram.mmd).
 - [Clases persistidas](docs/diagrams/class_diagram.mmd) y [ER completo](docs/diagrams/er_diagrams/agrifos_er_diagram.mmd).
