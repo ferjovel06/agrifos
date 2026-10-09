@@ -1,6 +1,6 @@
 erDiagram
     %% AUTH_USER is external Supabase auth.users, represented by its id only.
-    %% SQLAlchemy models: offline-first proposal from main 8182f9f; October 2026.
+    %% SQLAlchemy models at feat/npk-measurement-reliability 19df436; October 2026.
     AUTH_USER ||--o| USER : id
     USER ||--o{ FARM : user_id
     CROP ||--o{ PARCEL : crop_id
@@ -9,6 +9,11 @@ erDiagram
     CROP ||--o{ VARIETY : crop_id
     PARCEL ||--o{ READING : parcel_id
     PARCEL ||--o{ LAB_ANALYSIS : parcel_id
+    READING ||--o{ READING_RESULT : reading_id
+    READING ||--o{ CALIBRATION_PAIR_RECORD : reading_id
+    USER ||--o{ CALIBRATION_PAIR_RECORD : user_id
+    USER ||--o{ SENSOR_CALIBRATION : user_id
+    SENSOR_CALIBRATION o|--o{ READING_RESULT : calibration_id
     CROP ||--o{ PHENOLOGICAL_STAGE_TEMPLATE : crop_id
     PARCEL ||--o{ PARCEL_PHENOLOGICAL_STAGE : parcel_id
     PHENOLOGICAL_STAGE_TEMPLATE ||--o{ PARCEL_PHENOLOGICAL_STAGE : template_id
@@ -100,15 +105,54 @@ erDiagram
     READING {
         int revision
         uuid parcel_id FK
-        float nitrogen
-        float phosphorus
-        float potassium
-        float ec
-        float ph
-        float temperature
-        float humidity
+        float nitrogen "nullable for contract v1"
+        float phosphorus "nullable for contract v1"
+        float potassium "nullable for contract v1"
+        float ec "nullable for contract v1"
+        float ph "nullable for contract v1"
+        float temperature "nullable for contract v1"
+        float humidity "nullable for contract v1"
+        jsonb measurement "nullable legacy; immutable provenance"
+        jsonb derived_results "non-null cache projection"
+        timestamptz received_at "nullable legacy; unknown historical reception"
         datetime recorded_at
         uuid id PK
+    }
+    %% Legacy readings still require seven values; contract v1 can retain a subset.
+    %% reading_results: append-only; UNIQUE(reading_id, fingerprint).
+    READING_RESULT {
+        uuid id PK
+        uuid reading_id FK
+        string fingerprint
+        string algorithm_version
+        uuid calibration_id FK "nullable"
+        jsonb payload
+        timestamptz created_at
+    }
+    %% sensor_calibration_pairs: append-only; UNIQUE(user_id, reading_id, variable).
+    %% context_key groups known session/point/device/parcel/depth repetitions.
+    CALIBRATION_PAIR_RECORD {
+        uuid id PK
+        uuid user_id FK
+        uuid reading_id FK
+        string sample_id
+        string context_key "nullable when point unknown"
+        string variable
+        jsonb laboratory "method, basis, units, depth and reference evidence"
+        timestamptz created_at
+    }
+    %% sensor_calibrations: UNIQUE(user_id, profile_id, version).
+    %% pair_ids stores UUIDs in JSONB; application reauthorizes originals (no FK).
+    SENSOR_CALIBRATION {
+        uuid id PK
+        uuid user_id FK
+        string profile_id
+        int version
+        string state "candidate / validated / retired"
+        jsonb profile "immutable candidate version"
+        jsonb pair_ids
+        jsonb validation "nullable; immutable server validation evidence"
+        timestamptz created_at
     }
     LAB_ANALYSIS {
         int revision

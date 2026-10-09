@@ -1,0 +1,531 @@
+{
+  "date": "2026-10-09",
+  "branch": "feat/npk-measurement-reliability",
+  "base": "532ad74c919bc0b620b4b20f1d0d7e568a8d20b6",
+  "tested_software_head": "5e4b6296b72e25080aeee0e0892fed0ce95de5cc",
+  "physical_usb": "NOT RUN",
+  "independent_physical_samples": 0,
+  "physical_repetitions": 0,
+  "empirical_calibration": "NOT RUN",
+  "backend": {
+    "status": "PASS",
+    "tests": 200,
+    "skipped": 0,
+    "seconds": 32.67
+  },
+  "flutter": {
+    "status": "PASS",
+    "tests": 147,
+    "skipped_http_fixture": 1,
+    "seconds": 21
+  },
+  "flutter_analyze": "PASS",
+  "sqlite_v1_v2_rollback": "PASS",
+  "alembic_check": {
+    "status": "FAIL",
+    "also_reproduced_on_unchanged_base": true,
+    "differences": [
+      "external auth.users comparison",
+      "ix_agronomic_reference_sets_active",
+      "optimal_requirements stage_id FK RESTRICT",
+      "stage_factors stage_id FK RESTRICT"
+    ],
+    "new_sensor_differences": 0
+  },
+  "baseline_integration": {
+    "status": "PASS",
+    "reading_records": 1,
+    "operation_receipts": 1,
+    "lab_records": 1,
+    "initial_queued_operations": 2,
+    "remote_lab_nitrogen": 77.0,
+    "lost_response_replayed": true,
+    "sqlite_reopened": true,
+    "real_http": true,
+    "real_postgresql": true,
+    "jwt_es256": true,
+    "conflict_review": true
+  },
+  "sensor_integration": {
+    "status": "PASS",
+    "reading_records": 1,
+    "operation_receipts": 1,
+    "lab_records": 1,
+    "initial_queued_operations": 2,
+    "remote_lab_nitrogen": 77.0,
+    "lost_response_replayed": true,
+    "sqlite_reopened": true,
+    "real_http": true,
+    "real_postgresql": true,
+    "jwt_es256": true,
+    "conflict_review": true,
+    "raw_provenance_preserved": true,
+    "acquisition_time_preserved": true,
+    "unmeasured_variables_absent": true,
+    "derived_result_records": 1,
+    "deferred_processing_returned": true,
+    "processing_replay_idempotent": true,
+    "physical_usb": "NOT RUN"
+  },
+  "synthetic_filter_benchmark": {
+    "evidence": "synthetic software benchmark; no real sensor or laboratory data",
+    "cases": {
+      "same_point_spike": {
+        "none": {
+          "output": [
+            15.2,
+            15.4,
+            45.0,
+            15.5,
+            15.3
+          ],
+          "metrics": {
+            "count": 5,
+            "median": 15.4,
+            "mad": 0.09999999999999964,
+            "population_stddev": 11.860421577667465,
+            "mae": 6.0,
+            "rmse": 13.237975676061653,
+            "bias": 5.88
+          },
+          "mean_seconds_per_batch": 4.1492599993944165e-05
+        },
+        "mean": {
+          "output": [
+            15.2,
+            15.4,
+            21.28,
+            15.5,
+            15.3
+          ],
+          "metrics": {
+            "count": 5,
+            "median": 15.4,
+            "mad": 0.09999999999999964,
+            "population_stddev": 2.37410699000698,
+            "mae": 1.2560000000000002,
+            "rmse": 2.6318966545060243,
+            "bias": 1.136
+          },
+          "mean_seconds_per_batch": 5.033579998416826e-05
+        },
+        "median": {
+          "output": [
+            15.2,
+            15.4,
+            15.4,
+            15.5,
+            15.3
+          ],
+          "metrics": {
+            "count": 5,
+            "median": 15.4,
+            "mad": 0.09999999999999964,
+            "population_stddev": 0.10198039027185589,
+            "mae": 0.08000000000000007,
+            "rmse": 0.10954451150103348,
+            "bias": -0.040000000000000216
+          },
+          "mean_seconds_per_batch": 5.085440000402741e-05
+        }
+      },
+      "physical_spatial_step": {
+        "none": {
+          "output": [
+            10.0,
+            10.0,
+            10.0,
+            10.0,
+            10.0,
+            100.0,
+            100.0,
+            100.0,
+            100.0,
+            100.0
+          ],
+          "metrics": {
+            "count": 10,
+            "median": 55.0,
+            "mad": 45.0,
+            "population_stddev": 45.0,
+            "mae": 0.0,
+            "rmse": 0.0,
+            "bias": 0.0
+          },
+          "mean_seconds_per_batch": 8.702740000444464e-05
+        },
+        "mean": {
+          "output": [
+            10.0,
+            10.0,
+            10.0,
+            10.0,
+            10.0,
+            100.0,
+            100.0,
+            100.0,
+            100.0,
+            100.0
+          ],
+          "metrics": {
+            "count": 10,
+            "median": 55.0,
+            "mad": 45.0,
+            "population_stddev": 45.0,
+            "mae": 0.0,
+            "rmse": 0.0,
+            "bias": 0.0
+          },
+          "mean_seconds_per_batch": 9.468799998285249e-05
+        },
+        "median": {
+          "output": [
+            10.0,
+            10.0,
+            10.0,
+            10.0,
+            10.0,
+            100.0,
+            100.0,
+            100.0,
+            100.0,
+            100.0
+          ],
+          "metrics": {
+            "count": 10,
+            "median": 55.0,
+            "mad": 45.0,
+            "population_stddev": 45.0,
+            "mae": 0.0,
+            "rmse": 0.0,
+            "bias": 0.0
+          },
+          "mean_seconds_per_batch": 8.845579999615438e-05
+        }
+      }
+    }
+  },
+  "new_dependencies": [],
+  "lockfiles_changed": [],
+  "evidence_files": [
+    {
+      "path": "tmp/sensor/backend-acceptance-final.log",
+      "sha256": "cce10ed6b5888965a554c1135d379856b6c6c3e8be7f56c4413e36d09e8c3cca"
+    },
+    {
+      "path": "tmp/sensor/offline-http-baseline-final.log",
+      "sha256": "bf6d439b0ef05deeb1d63a440aa0b6521c7022d9bd29783588e19bf37213143a"
+    },
+    {
+      "path": "tmp/sensor/offline-http-sensor-final.log",
+      "sha256": "22dde10635ba4dafe80c805123265c12169a3f050bbe1c4838d1758e831ccd94"
+    },
+    {
+      "path": "tmp/sensor/alembic-check.log",
+      "sha256": "be840fdbfd342521e6c1ca16cc3025086aab361994be09793f701d475ae1bd05"
+    },
+    {
+      "path": "tmp/sensor/baseline-postgres.log",
+      "sha256": "b61794727f271383653176ce88e04444dd0f2502f16a76c4b4a090a65d52d677"
+    },
+    {
+      "path": "tmp/sensor/baseline-alembic-check.log",
+      "sha256": "aae3fb2a06498db82c3e26d799ec0f8045a0d3dc7e480cbab733e2c9169d9ae7"
+    },
+    {
+      "path": "app_flutter/.dart_tool/sensor-validation/analyze.log",
+      "sha256": "fc098f9fe4150632e2c33ed4fe222f1b89de43e962694ca95fe449744fcaf5b7"
+    },
+    {
+      "path": "app_flutter/.dart_tool/sensor-validation/flutter-test.log",
+      "sha256": "c4f860c8795d65efe314a77be615fe7b5f03b3f70415166b4394a429c857326c"
+    }
+  ],
+  "changed_files": [
+    {
+      "path": ".github/workflows/ci.yml",
+      "status": "M"
+    },
+    {
+      "path": ".github/workflows/offline-integration.yml",
+      "status": "M"
+    },
+    {
+      "path": "README.md",
+      "status": "M"
+    },
+    {
+      "path": "app_flutter/SENSOR_ACQUISITION.md",
+      "status": "A"
+    },
+    {
+      "path": "app_flutter/android/app/src/main/AndroidManifest.xml",
+      "status": "M"
+    },
+    {
+      "path": "app_flutter/android/app/src/main/kotlin/com/example/app_flutter/MainActivity.kt",
+      "status": "M"
+    },
+    {
+      "path": "app_flutter/android/app/src/main/res/xml/device_filter.xml",
+      "status": "D"
+    },
+    {
+      "path": "app_flutter/lib/data/api/api_client.dart",
+      "status": "M"
+    },
+    {
+      "path": "app_flutter/lib/data/api/readings_repository.dart",
+      "status": "M"
+    },
+    {
+      "path": "app_flutter/lib/data/local/offline_database.dart",
+      "status": "M"
+    },
+    {
+      "path": "app_flutter/lib/data/sensor/sensor_protocol.dart",
+      "status": "A"
+    },
+    {
+      "path": "app_flutter/lib/data/sensor/sensor_reading.dart",
+      "status": "A"
+    },
+    {
+      "path": "app_flutter/lib/data/sensor/usb_sensor_service.dart",
+      "status": "M"
+    },
+    {
+      "path": "app_flutter/lib/data/sync/offline_runtime.dart",
+      "status": "M"
+    },
+    {
+      "path": "app_flutter/lib/data/sync/sync_engine.dart",
+      "status": "M"
+    },
+    {
+      "path": "app_flutter/lib/domain/entities/reading.dart",
+      "status": "M"
+    },
+    {
+      "path": "app_flutter/lib/presentation/home/widgets/last_reading_card.dart",
+      "status": "M"
+    },
+    {
+      "path": "app_flutter/lib/presentation/sensor/sensor_provider.dart",
+      "status": "M"
+    },
+    {
+      "path": "app_flutter/lib/presentation/sensor/sensor_screen.dart",
+      "status": "M"
+    },
+    {
+      "path": "app_flutter/lib/presentation/sensor/widgets/telemetry_card.dart",
+      "status": "M"
+    },
+    {
+      "path": "app_flutter/test/data/sensor_offline_test.dart",
+      "status": "A"
+    },
+    {
+      "path": "app_flutter/test/data/sensor_protocol_test.dart",
+      "status": "A"
+    },
+    {
+      "path": "app_flutter/test/data/usb_sensor_service_test.dart",
+      "status": "A"
+    },
+    {
+      "path": "app_flutter/test/integration/offline_http_test.dart",
+      "status": "M"
+    },
+    {
+      "path": "app_flutter/test/presentation/sensor/widgets/provenance_telemetry_test.dart",
+      "status": "A"
+    },
+    {
+      "path": "app_flutter/test/support/sensor_fixture.dart",
+      "status": "A"
+    },
+    {
+      "path": "backend/alembic/versions/1a2b3c4d5e6f_preserve_sensor_measurement_provenance.py",
+      "status": "A"
+    },
+    {
+      "path": "backend/app/main.py",
+      "status": "M"
+    },
+    {
+      "path": "backend/app/models/__init__.py",
+      "status": "M"
+    },
+    {
+      "path": "backend/app/models/measurement.py",
+      "status": "A"
+    },
+    {
+      "path": "backend/app/models/soil.py",
+      "status": "M"
+    },
+    {
+      "path": "backend/app/repositories/calibration.py",
+      "status": "A"
+    },
+    {
+      "path": "backend/app/repositories/reading.py",
+      "status": "M"
+    },
+    {
+      "path": "backend/app/routers/calibrations.py",
+      "status": "A"
+    },
+    {
+      "path": "backend/app/routers/diagnostic.py",
+      "status": "M"
+    },
+    {
+      "path": "backend/app/routers/fertilization.py",
+      "status": "M"
+    },
+    {
+      "path": "backend/app/routers/offline.py",
+      "status": "M"
+    },
+    {
+      "path": "backend/app/routers/readings.py",
+      "status": "M"
+    },
+    {
+      "path": "backend/app/schemas/calibration.py",
+      "status": "A"
+    },
+    {
+      "path": "backend/app/schemas/measurement.py",
+      "status": "A"
+    },
+    {
+      "path": "backend/app/schemas/reading.py",
+      "status": "M"
+    },
+    {
+      "path": "backend/app/services/measurement_processing.py",
+      "status": "A"
+    },
+    {
+      "path": "backend/app/services/sensor_calibration.py",
+      "status": "A"
+    },
+    {
+      "path": "backend/tests/test_measurement_contract.py",
+      "status": "A"
+    },
+    {
+      "path": "backend/tests/test_measurement_processing.py",
+      "status": "A"
+    },
+    {
+      "path": "backend/tests/test_sensor_calibration.py",
+      "status": "A"
+    },
+    {
+      "path": "backend/tests/test_sensor_postgres.py",
+      "status": "A"
+    },
+    {
+      "path": "docs/ESTADO_IMPLEMENTADO.md",
+      "status": "M"
+    },
+    {
+      "path": "docs/README.md",
+      "status": "M"
+    },
+    {
+      "path": "docs/diagrams/architecture_diagram.mmd",
+      "status": "M"
+    },
+    {
+      "path": "docs/diagrams/class_diagram.mmd",
+      "status": "M"
+    },
+    {
+      "path": "docs/diagrams/er_diagrams/agrifos_er_diagram.mmd",
+      "status": "M"
+    },
+    {
+      "path": "docs/diagrams/er_diagrams/er_soil_data.mmd",
+      "status": "M"
+    },
+    {
+      "path": "docs/sensor-audit.md",
+      "status": "A"
+    },
+    {
+      "path": "docs/sensor-calibration-plan.md",
+      "status": "A"
+    },
+    {
+      "path": "docs/sensor-evidence.json",
+      "status": "A"
+    },
+    {
+      "path": "docs/sensor-measurements.md",
+      "status": "A"
+    },
+    {
+      "path": "docs/sensor-validation.md",
+      "status": "A"
+    },
+    {
+      "path": "scripts/offline_integration.py",
+      "status": "M"
+    },
+    {
+      "path": "scripts/sensor_filter_benchmark.py",
+      "status": "A"
+    }
+  ],
+  "commits_verified_at_recording": [
+    {
+      "sha": "e55f98dd2c4f1549dd8c007e4144984c71dddd7d",
+      "subject": "docs(sensor): characterize unverified USB acquisition and data flow"
+    },
+    {
+      "sha": "c8f07d49bdb5274df55a5a497e59b11a116eb6c0",
+      "subject": "feat(sensor): add non-destructive quality checks and grouped filters"
+    },
+    {
+      "sha": "486902dee47a842c7baad1496e8b623ea134ce13",
+      "subject": "feat(calibration): validate grouped models and constrain versioned estimates"
+    },
+    {
+      "sha": "19df4363ccc11f271e16b3b014c86ba25a805b11",
+      "subject": "feat(readings): persist immutable provenance and versioned calibration evidence"
+    },
+    {
+      "sha": "71b6225f9e0c49a28c904182ab78312d3889bd20",
+      "subject": "fix(sensor): preserve decoder and soil boundaries in repeated measurements"
+    },
+    {
+      "sha": "7e1d8571bdffe6d4d91b5c68f3f3c6658e588cd3",
+      "subject": "test(sensor): verify real offline processing and immutable PostgreSQL evidence"
+    },
+    {
+      "sha": "f0acdec205ddd369415121fa34ac21e3fe4bed8b",
+      "subject": "fix(sensor): require reviewed USB profiles and preserve acquisition evidence"
+    },
+    {
+      "sha": "5e4b6296b72e25080aeee0e0892fed0ce95de5cc",
+      "subject": "feat(offline): process raw sensor sessions through the existing sync engine"
+    }
+  ],
+  "not_run": [
+    "physical sensor/OTG/power/authentic frames",
+    "live Supabase Auth and actual MFA enrollment",
+    "Android build/licenses/signing/keychain",
+    "laboratory accuracy and uncertainty"
+  ],
+  "publication": {
+    "status": "NOT RUN",
+    "base": "feat/offline-first-foundation",
+    "draft_planned": true
+  }
+}

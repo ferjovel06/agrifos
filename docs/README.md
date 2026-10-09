@@ -8,6 +8,10 @@ Base `origin/main` (`8182f9f`); propuesta offline-first en rama independiente, o
 | [Offline-first](offline-first.md) | Alcance, sincronización, seguridad y uso |
 | [Refactorización offline](offline-refactor.md) | Auditoría, métricas y simplificaciones aplicadas |
 | [Validación offline](offline-validation.md) | Pruebas reales y pendientes |
+| [Auditoría USB](sensor-audit.md) | Ruta original y matriz de información física faltante |
+| [Mediciones trazables](sensor-measurements.md) | Contrato, adquisición, calidad, procesamiento y reprocesamiento |
+| [Campaña de calibración](sensor-calibration-plan.md) | Muestreo, comparabilidad, validación y aceptación física |
+| [Validación NPK](sensor-validation.md) | PASS/FAIL/NOT RUN, evidencia, resultados y entrega dependiente |
 | [Estado implementado](ESTADO_IMPLEMENTADO.md) | Capacidades, límites y fuentes de verdad |
 | [Motor](agrifos_engine_documentation.md) | Contrato, cálculo, unidades y persistencia |
 | [Guía de evaluación](guia_evaluador.md) | Recorrido API y aplicación |

@@ -4,7 +4,7 @@
 
 Documentación sincronizada el 8 de octubre de 2026 con `main` en `f986ccb` (PR #74). Alcance inicial: café; plataforma escalable a otros cultivos. Véase el [estado implementado](docs/ESTADO_IMPLEMENTADO.md).
 
-Sistema de asistencia agrícola compuesto por una plataforma digital interactiva que combina dos fuentes de datos del suelo: un **sensor de suelo genérico 7 en 1 conectado vía cable OTG** y la **captura manual de análisis de laboratorio**. A través de la aplicación móvil, el agricultor registra su finca y perfila sus parcelas seleccionando el tipo de planta y su etapa de crecimiento. Al conectar el sensor mediante cable OTG, la aplicación despliega un tablero de control en tiempo real con los niveles de NPK, conductividad eléctrica, pH, temperatura y humedad; alternativamente, el agricultor puede introducir manualmente los resultados de un análisis de laboratorio para una planificación de fertilización más completa.
+Sistema de asistencia agrícola que combina captura de sensores y análisis de laboratorio. El controlador Android USB/OTG requiere un perfil documentado y un dispositivo seleccionado: **el modelo, protocolo, alimentación y funcionamiento físico de la sonda todavía no están validados**. La aplicación conserva exclusivamente variables recibidas, su procedencia y sus limitaciones; no genera valores cuando falla el hardware. El agricultor registra fincas y parcelas y puede introducir análisis de laboratorio para planificación. Véanse la [auditoría USB](docs/sensor-audit.md), el [contrato de mediciones](docs/sensor-measurements.md) y el [plan de calibración](docs/sensor-calibration-plan.md).
 
 ## Tabla de contenidos
 - [Arquitectura](#arquitectura)
@@ -28,14 +28,14 @@ Sistema de asistencia agrícola compuesto por una plataforma digital interactiva
 La arquitectura implementada está en [architecture_diagram.mmd](docs/diagrams/architecture_diagram.mmd). Los recursos PNG/SVG anteriores son ilustraciones históricas del diseño objetivo; no sustituyen estos diagramas Mermaid ni los contratos del código.
 
 **Flujo de datos**
-1. **Sensor de suelo genérico 7 en 1 (OTG):** dispositivo comercial de sonda multiparamétrica (NPK, CE, pH, temperatura, humedad) que se conecta al teléfono/tablet mediante cable OTG (USB Serial/CDC).
-2. **App (Flutter):** detecta el sensor conectado por OTG, permite capturar análisis de laboratorio y consume la API REST. Supabase Auth gestiona registro, confirmación de correo, sesiones, recuperación de contraseña y MFA TOTP. Planificación incluye calendario mensual/semanal por finca, pronóstico de 7 días y alertas climáticas. Finanzas permite gestionar ingresos y egresos y consultar métricas por finca desde la API.
+1. **Sensor USB/OTG:** interfaz y variables pendientes de confirmar con su manual y hardware. El parser Modbus es utilizable solo si ese protocolo está verificado; no hay un mapa de registros de producción supuesto.
+2. **App (Flutter):** enumeración y selección USB, perfil verificado, tramas/CRC y guardado offline con UUID y hora de adquisición. El procesamiento diferido usa el coordinador existente; valores crudos, filtrados y calibrados permanecen diferenciados. Supabase Auth gestiona registro, sesiones y MFA TOTP. Planificación incluye clima y alertas; Finanzas gestiona ingresos/egresos desde la API.
 3. **Backend (FastAPI):** valida los JWT de Supabase, aplica permisos por rol, persiste la información en PostgreSQL y expone los servicios de diagnóstico, fertilización, fenología y clima. El router `/finances` está publicado y aplica autorización por finca.
 4. **Servicio externo de clima:** proveedor meteorológico de terceros consultado por el backend para generar alertas predictivas (lluvias, canículas, olas de calor).
-5. **Base de datos (PostgreSQL):** modelo relacional de 27 entidades de aplicación y la referencia externa a `auth.users`, incluidas referencias agronómicas versionadas, etapas fenológicas normalizadas y recomendaciones de fertilización persistidas — ver [Modelo de datos](#modelo-de-datos) para el detalle completo.
+5. **Base de datos (PostgreSQL):** 34 tablas de aplicación y la referencia externa a `auth.users`: las 27 entidades agronómicas originales, cuatro tablas offline/clima y tres tablas de evidencia de sensores. Incluye originales inmutables, resultados derivados y perfiles versionados — ver [Modelo de datos](#modelo-de-datos).
 
 ## Modelo de datos
-El diagrama ER completo del modelo (27 entidades de aplicación + `auth.users`, 42 relaciones) está versionado en [`docs/diagrams/er_diagrams/agrifos_er_diagram.mmd`](docs/diagrams/er_diagrams/agrifos_er_diagram.mmd) (formato [Mermaid](https://mermaid.live)). También se divide en vistas por módulo para facilitar su lectura:
+El diagrama ER del modelo (34 tablas de aplicación + `auth.users`) está versionado en [`docs/diagrams/er_diagrams/agrifos_er_diagram.mmd`](docs/diagrams/er_diagrams/agrifos_er_diagram.mmd) (formato [Mermaid](https://mermaid.live)). También se divide en vistas por módulo para facilitar su lectura:
 
 - [Estructura de finca](docs/diagrams/er_diagrams/er_core_farm.mmd)
 - [Datos de suelo](docs/diagrams/er_diagrams/er_soil_data.mmd)
@@ -51,6 +51,8 @@ El diagrama ER completo del modelo (27 entidades de aplicación + `auth.users`, 
 |---|---|
 | Usuarios y estructura de finca | `AuthUser` (referencia externa Supabase), `User`, `Farm`, `Parcel`, `Crop`, `Variety` |
 | Datos de suelo | `Reading` (sensor OTG), `LabAnalysis` (laboratorio) |
+| Evidencia del sensor | `ReadingResult`, `CalibrationPairRecord`, `SensorCalibration`: resultados append-only, pares con método/base y perfiles candidato/validado/retirado |
+| Offline y clima | `SyncChange`, `SyncReceipt`, `SyncCursor`, `WeatherHttpCache` |
 | Fenología | `PhenologicalStageTemplate` define el ciclo estándar y las etapas reutilizables de cada cultivo; `ParcelPhenologicalStage` registra las fechas estimadas y reales de cada parcela |
 | Referencias agronómicas versionadas | `AgronomicReferenceSet`, `SoilReferenceRange`, `FertilizerProduct`, `FertilizerProductNutrient`, `ApplicationScheduleRule`, `AgronomicParameter`, `OptimalRequirement`, `ExtractionIndex`, `VarietyFactor`, `StageFactor`, `SoilType`, `EfficiencyFactor` |
 | Resultado del motor | `FertilizationPlan` y `FertilizationPlanItem` conservan la versión del motor, la fuente, los escenarios, los productos, las dosis y el calendario de aplicación generado |
@@ -64,7 +66,7 @@ El diagrama ER completo del modelo (27 entidades de aplicación + `auth.users`, 
 Traduce los datos del suelo en recomendaciones de fertilización mediante dos vías. El motor implementado está orientado a **café**, y calcula el balance de N, P y K según el contexto fenológico.
 
 **Vía A — Basada en Sensor de Suelo Genérico 7 en 1 (Monitoreo Rápido y Dinámico)**
-- **Parámetros utilizados:** Nitrógeno (N), Fósforo (P), Potasio (K), pH, Humedad, Temperatura y Conductividad Eléctrica (CE), leídos vía OTG.
+- **Parámetros posibles:** N/P/K, pH, humedad, temperatura y CE, exclusivamente si están documentados y recibidos. Las nuevas mediciones no generan dosis definitivas hasta validar la comparabilidad agronómica; una estimación calibrada tampoco demuestra por sí sola disponibilidad de nutrientes.
 
 **Vía B — Basada en Análisis de Laboratorio (Planificación Estratégica)**
 - **Datos capturados:** pH, MO, CIC, textura, N, P, K, Ca, Mg y S, además de metadatos de muestreo y método. Capturar Ca/Mg/S no significa que el plan calcule sus déficits: el balance productivo integrado sigue limitado a N/P₂O₅/K₂O.
