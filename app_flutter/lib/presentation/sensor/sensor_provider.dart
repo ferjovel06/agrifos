@@ -101,7 +101,8 @@ class SensorProvider extends ChangeNotifier {
           _scheduleReconnect(e.message);
         } else {
           status = SensorStatus.error;
-          errorMessage = e.toString();
+          errorMessage =
+              'No se pudo leer el sensor. Revisa el cable OTG e intenta conectar de nuevo.';
           notifyListeners();
         }
       },
@@ -122,7 +123,7 @@ class SensorProvider extends ChangeNotifier {
     _retryCount++;
     status = SensorStatus.reconnecting;
     errorMessage =
-        'Conexión perdida ($reason). Reintentando '
+        'Se perdió la conexión con el sensor. Reintentando '
         '($_retryCount/$_maxAutoRetries)...';
     notifyListeners();
 
@@ -153,7 +154,8 @@ class SensorProvider extends ChangeNotifier {
             _scheduleReconnect(e.message);
           } else {
             status = SensorStatus.error;
-            errorMessage = e.toString();
+            errorMessage =
+                'No se pudo leer el sensor. Revisa el cable OTG e intenta conectar de nuevo.';
             notifyListeners();
           }
         },
@@ -189,7 +191,7 @@ class SensorProvider extends ChangeNotifier {
       notifyListeners();
     } catch (e) {
       saveStatus = SaveStatus.error;
-      saveErrorMessage = 'No se pudo guardar la lectura: $e';
+      saveErrorMessage = 'No se pudo guardar la lectura. Intenta nuevamente.';
       notifyListeners();
     }
   }
