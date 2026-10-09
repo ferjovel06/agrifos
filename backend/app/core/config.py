@@ -1,5 +1,6 @@
 from typing import Literal
 
+from cryptography.fernet import Fernet
 from pydantic import Field, SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -20,6 +21,10 @@ class Settings(BaseSettings):
     AUTH_ACCESS_TOKEN_SECONDS: int = Field(default=900, gt=0)
     AUTH_MAX_LOGIN_ATTEMPTS: int = Field(default=5, gt=0)
     AUTH_LOGIN_LOCK_SECONDS: int = Field(default=900, gt=0)
+    AUTH_MFA_ENCRYPTION_KEY: SecretStr = SecretStr("")
+    AUTH_MFA_CHALLENGE_SECONDS: int = Field(default=300, gt=0)
+    AUTH_MAX_MFA_ATTEMPTS: int = Field(default=5, gt=0)
+    AUTH_MFA_LOCK_SECONDS: int = Field(default=300, gt=0)
     WEATHER_TIMEOUT_SECONDS: float = Field(default=15.0, gt=0)
     WEATHER_CONNECT_TIMEOUT_SECONDS: float = Field(default=5.0, gt=0)
     WEATHER_REQUEST_ATTEMPTS: int = Field(default=2, ge=1)
@@ -40,6 +45,11 @@ class Settings(BaseSettings):
     def validate_native_auth(self):
         if self.AUTH_PROVIDER == "native" and len(self.AUTH_JWT_SECRET.get_secret_value().encode()) < 32:
             raise ValueError("Native authentication requires a JWT secret of at least 32 bytes.")
+        if self.AUTH_PROVIDER == "native":
+            try:
+                Fernet(self.AUTH_MFA_ENCRYPTION_KEY.get_secret_value().encode())
+            except (ValueError, TypeError) as error:
+                raise ValueError("Native MFA requires a valid Fernet encryption key.") from error
         return self
 
     @property
@@ -50,6 +60,6 @@ class Settings(BaseSettings):
             if origin.strip()
         ]
 
-    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+    model_config = SettingsConfigDict(env_file=".env", extra="ignore", hide_input_in_errors=True)
 
 settings = Settings()

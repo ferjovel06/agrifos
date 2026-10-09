@@ -15,7 +15,7 @@ from app.repositories.auth import get_login_account
 _dummy_hash = password_hash.hash(secrets.token_urlsafe(32))
 
 
-async def authenticate_user(db: AsyncSession, email: str, password: str) -> User:
+async def authenticate_user(db: AsyncSession, email: str, password: str) -> tuple[User, AuthCredential]:
     account = await get_login_account(db, email)
     credential, user = account if account else (None, None)
     now = datetime.now(timezone.utc)
@@ -32,13 +32,13 @@ async def authenticate_user(db: AsyncSession, email: str, password: str) -> User
         await _record_failed_attempt(db, credential, now)
         raise HTTPException(401, "Correo o contraseña incorrectos.")
 
-    _check_account_access(credential, now)
+    check_account_access(credential, now)
     credential.failed_attempts = 0
     credential.locked_until = None
     if updated_hash:
         credential.password_hash = updated_hash
     await db.commit()
-    return user
+    return user, credential
 
 
 async def _record_failed_attempt(db: AsyncSession, credential: AuthCredential | None, now: datetime):
@@ -53,10 +53,8 @@ async def _record_failed_attempt(db: AsyncSession, credential: AuthCredential | 
     await db.commit()
 
 
-def _check_account_access(credential: AuthCredential, now: datetime):
+def check_account_access(credential: AuthCredential, now: datetime):
     if credential.banned_until and credential.banned_until > now:
         raise HTTPException(403, "Esta cuenta no puede iniciar sesión.")
     if not credential.email_confirmed:
         raise HTTPException(403, "Confirma tu correo antes de iniciar sesión.")
-    if credential.mfa_enabled:
-        raise HTTPException(403, detail={"code": "mfa_required", "message": "Completa la verificación en dos pasos para continuar."})

@@ -50,7 +50,8 @@ class LoginServiceTests(unittest.IsolatedAsyncioTestCase):
     async def test_valid_legacy_login_upgrades_hash_and_clears_failed_attempts(self):
         self.credential.failed_attempts = 2
         result = await authenticate_user(self.db, self.user.email, self.password)
-        self.assertIs(result, self.user)
+        self.assertIs(result[0], self.user)
+        self.assertIs(result[1], self.credential)
         self.assertTrue(self.credential.password_hash.startswith("$argon2id$"))
         self.assertEqual(self.credential.failed_attempts, 0)
         self.db.commit.assert_awaited_once()
@@ -93,12 +94,10 @@ class LoginServiceTests(unittest.IsolatedAsyncioTestCase):
         await self.assert_denied(self.password, 403)
         self.db.commit.assert_not_awaited()
 
-    async def test_mfa_account_cannot_bypass_second_factor(self):
+    async def test_password_step_preserves_requirement_for_second_factor(self):
         self.credential.mfa_enabled = True
-        error = await self.assert_denied(self.password, 403)
-        self.assertEqual(error.detail["code"], "mfa_required")
-        self.assertEqual(self.credential.password_hash, self.legacy_hash)
-        self.db.commit.assert_not_awaited()
+        result = await authenticate_user(self.db, self.user.email, self.password)
+        self.assertTrue(result[1].mfa_enabled)
 
     async def test_missing_or_invalid_hash_is_rejected(self):
         for value in (None, "invalid-hash"):
@@ -167,7 +166,8 @@ class LoginRouteTests(unittest.TestCase):
 
     def test_login_returns_a_valid_noncacheable_bearer_token(self):
         user = SimpleNamespace(id=uuid4(), email="farmer@example.com")
-        with patch.object(settings, "AUTH_PROVIDER", "native"), patch.object(settings, "AUTH_JWT_SECRET", SecretStr(TEST_SECRET)), patch("app.routers.auth.authenticate_user", new=AsyncMock(return_value=user)):
+        credential = SimpleNamespace(mfa_enabled=False)
+        with patch.object(settings, "AUTH_PROVIDER", "native"), patch.object(settings, "AUTH_JWT_SECRET", SecretStr(TEST_SECRET)), patch("app.routers.auth.authenticate_user", new=AsyncMock(return_value=(user, credential))):
             response = self.client.post("/auth/login", json={"email": user.email, "password": "test"})
             claims = verify_access_token(response.json()["access_token"])
         self.assertEqual(response.status_code, 200)
@@ -176,8 +176,9 @@ class LoginRouteTests(unittest.TestCase):
         self.assertEqual(claims["sub"], str(user.id))
 
     def test_invalid_email_and_oversized_password_are_rejected(self):
-        for payload in ({"email": "not-email", "password": "test"}, {"email": "farmer@example.com", "password": "x" * 1025}):
-            self.assertEqual(self.client.post("/auth/login", json=payload).status_code, 422)
+        with patch.object(settings, "AUTH_PROVIDER", "native"):
+            for payload in ({"email": "not-email", "password": "test"}, {"email": "farmer@example.com", "password": "x" * 1025}):
+                self.assertEqual(self.client.post("/auth/login", json=payload).status_code, 422)
 
 
 class NativeVerificationTests(unittest.IsolatedAsyncioTestCase):

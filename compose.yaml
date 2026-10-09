@@ -39,6 +39,7 @@ services:
       ALLOWED_ORIGINS: "${ALLOWED_ORIGINS:-}"
       AUTH_PROVIDER: "${AUTH_PROVIDER:-supabase}"
       AUTH_JWT_SECRET: "${AUTH_JWT_SECRET:-}"
+      AUTH_MFA_ENCRYPTION_KEY: "${AUTH_MFA_ENCRYPTION_KEY:-}"
     read_only: true
     cap_drop: [ALL]
     tmpfs: [/tmp]

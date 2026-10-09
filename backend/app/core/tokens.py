@@ -1,5 +1,6 @@
 from datetime import datetime, timedelta, timezone
 from uuid import UUID, uuid4
+from typing import Literal
 
 import jwt
 
@@ -7,7 +8,7 @@ from app.core.config import settings
 from app.models import User
 
 
-def create_access_token(user: User) -> str:
+def create_access_token(user: User, *, aal: Literal["aal1", "aal2"] = "aal1") -> str:
     now = datetime.now(timezone.utc)
     return jwt.encode(
         {
@@ -18,7 +19,7 @@ def create_access_token(user: User) -> str:
             "iss": settings.AUTH_JWT_ISSUER,
             "aud": settings.AUTH_JWT_AUDIENCE,
             "jti": str(uuid4()),
-            "aal": "aal1",
+            "aal": aal,
             "type": "access",
         },
         settings.AUTH_JWT_SECRET.get_secret_value(),

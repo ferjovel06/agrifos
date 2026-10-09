@@ -1,5 +1,5 @@
 from app.models.user import User
-from app.models.auth import AuthCredential
+from app.models.auth import AuthCredential, AuthMfaChallenge, AuthMfaFactor
 from app.models.farm import Farm, Parcel
 from app.models.crop import Crop, Variety
 from app.models.soil import Reading, LabAnalysis
@@ -27,6 +27,8 @@ from app.models.finance import Expense, Income, Production
 __all__ = [
     "User",
     "AuthCredential",
+    "AuthMfaChallenge",
+    "AuthMfaFactor",
     "Farm",
     "Parcel",
     "Crop",
