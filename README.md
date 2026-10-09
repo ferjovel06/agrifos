@@ -174,7 +174,12 @@ WEATHER_TIMEOUT_SECONDS=15
 WEATHER_CONNECT_TIMEOUT_SECONDS=5
 WEATHER_REQUEST_ATTEMPTS=2
 WEATHER_FALLBACK_REQUEST_ATTEMPTS=1
+WEATHER_CACHE_FRESH_SECONDS=1800
+WEATHER_CACHE_STALE_SECONDS=21600
+WEATHER_CACHE_RETRY_SECONDS=60
 ```
+
+La caché meteorológica se comparte entre solicitudes dentro de cada proceso del backend. Conserva el pronóstico vigente durante `WEATHER_CACHE_FRESH_SECONDS` y agrupa consultas simultáneas para la misma finca, coordenadas y cantidad de días. Al vencer, consulta al proveedor; si los datos son iguales, reutiliza el pronóstico y renueva su vigencia. Ante un fallo, espera `WEATHER_CACHE_RETRY_SECONDS` antes de reintentar y puede servir el último pronóstico hasta `WEATHER_CACHE_STALE_SECONDS` desde su última consulta exitosa. La caché se pierde al reiniciar y no se comparte entre workers.
 
 App Flutter (`app_flutter/.env`):
 

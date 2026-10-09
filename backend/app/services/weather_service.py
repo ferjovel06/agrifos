@@ -1,7 +1,8 @@
+import asyncio
 from dataclasses import dataclass
 from datetime import date, datetime
 from time import monotonic
-from typing import Any, Callable
+from typing import Any, Awaitable, Callable
 
 from app.integrations.weather_contracts import (
     WeatherProvider,
@@ -19,6 +20,16 @@ class InvalidWeatherDataError(RuntimeError):
     pass
 
 
+_ForecastKey = tuple[str, float, float, int]
+_ForecastLoader = Callable[[], Awaitable[WeatherForecastRead]]
+
+
+def _consume_task_error(task: asyncio.Task[WeatherForecastRead]) -> None:
+    """Retrieve errors when all waiting requests have disconnected."""
+    if not task.cancelled():
+        task.exception()
+
+
 @dataclass
 class _CachedForecast:
     forecast: WeatherForecastRead
@@ -32,31 +43,37 @@ class WeatherForecastCache:
         fresh_seconds: float = 30 * 60,
         stale_seconds: float = 6 * 60 * 60,
         clock: Callable[[], float] = monotonic,
+        retry_seconds: float = 60,
     ):
+        if fresh_seconds <= 0 or stale_seconds < fresh_seconds or retry_seconds <= 0:
+            raise ValueError("Weather cache durations must be positive and stale >= fresh.")
         self._fresh_seconds = fresh_seconds
         self._stale_seconds = stale_seconds
+        self._retry_seconds = retry_seconds
         self._clock = clock
-        self._entries: dict[tuple[str, float, float, int], _CachedForecast] = {}
+        self._entries: dict[_ForecastKey, _CachedForecast] = {}
+        self._inflight: dict[_ForecastKey, asyncio.Task[WeatherForecastRead]] = {}
+        self._failures: dict[_ForecastKey, tuple[Exception, float]] = {}
 
     def get(
         self,
-        key: tuple[str, float, float, int],
+        key: _ForecastKey,
         *,
         allow_stale: bool = False,
     ) -> WeatherForecastRead | None:
         entry = self._entries.get(key)
         if entry is None:
             return None
-        deadline = entry.stale_until if allow_stale else entry.fresh_until
-        if self._clock() <= deadline:
-            return entry.forecast
-        if self._clock() > entry.stale_until:
+        now = self._clock()
+        if now >= entry.stale_until:
             self._entries.pop(key, None)
-        return None
+            return None
+        deadline = entry.stale_until if allow_stale else entry.fresh_until
+        return entry.forecast if now < deadline else None
 
     def put(
         self,
-        key: tuple[str, float, float, int],
+        key: _ForecastKey,
         forecast: WeatherForecastRead,
     ) -> None:
         now = self._clock()
@@ -65,6 +82,62 @@ class WeatherForecastCache:
             fresh_until=now + self._fresh_seconds,
             stale_until=now + self._stale_seconds,
         )
+        self._failures.pop(key, None)
+
+    async def get_or_load(
+        self, key: _ForecastKey, load: _ForecastLoader,
+    ) -> WeatherForecastRead:
+        cached = self.get(key)
+        if cached is not None:
+            return cached
+        error = self._retry_error(key)
+        if error is not None:
+            return self._stale_or_raise(key, error)
+        return await asyncio.shield(self._refresh_task(key, load))
+
+    def _retry_error(self, key: _ForecastKey) -> Exception | None:
+        failure = self._failures.get(key)
+        if failure is None:
+            return None
+        error, retry_at = failure
+        if self._clock() < retry_at:
+            return error
+        self._failures.pop(key, None)
+        return None
+
+    def _refresh_task(
+        self, key: _ForecastKey, load: _ForecastLoader,
+    ) -> asyncio.Task[WeatherForecastRead]:
+        task = self._inflight.get(key)
+        if task is None:
+            task = asyncio.create_task(self._refresh(key, load))
+            self._inflight[key] = task
+            task.add_done_callback(_consume_task_error)
+        return task
+
+    async def _refresh(
+        self, key: _ForecastKey, load: _ForecastLoader,
+    ) -> WeatherForecastRead:
+        try:
+            forecast = await load()
+            previous = self.get(key, allow_stale=True)
+            if previous == forecast:
+                forecast = previous
+            self.put(key, forecast)
+            return forecast
+        except (WeatherProviderError, InvalidWeatherDataError) as error:
+            self._failures[key] = (error, self._clock() + self._retry_seconds)
+            return self._stale_or_raise(key, error)
+        finally:
+            self._inflight.pop(key, None)
+
+    def _stale_or_raise(
+        self, key: _ForecastKey, error: Exception,
+    ) -> WeatherForecastRead:
+        stale = self.get(key, allow_stale=True)
+        if stale is not None:
+            return stale
+        raise error
 
 
 _shared_forecast_cache = WeatherForecastCache()
@@ -81,20 +154,9 @@ class WeatherService:
 
     async def forecast(self, farm: Farm, days: int) -> WeatherForecastRead:
         cache_key = (str(farm.id), farm.latitude, farm.longitude, days)
-        cached = self._cache.get(cache_key)
-        if cached is not None:
-            return cached
-
-        try:
-            forecast = await self._load_forecast(farm, days)
-        except (WeatherProviderError, InvalidWeatherDataError):
-            stale = self._cache.get(cache_key, allow_stale=True)
-            if stale is not None:
-                return stale
-            raise
-
-        self._cache.put(cache_key, forecast)
-        return forecast
+        return await self._cache.get_or_load(
+            cache_key, lambda: self._load_forecast(farm, days),
+        )
 
     async def _load_forecast(self, farm: Farm, days: int) -> WeatherForecastRead:
         try:
