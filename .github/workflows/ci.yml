@@ -4,6 +4,7 @@ on:
   pull_request:
     branches:
       - main
+      - feat/offline-first-foundation
   push:
     branches:
       - main
@@ -82,7 +83,7 @@ jobs:
         run: cp .env.example .env
 
       - name: Install dependencies
-        run: flutter pub get
+        run: flutter pub get --enforce-lockfile
 
       - name: Analyze Flutter code
         run: flutter analyze

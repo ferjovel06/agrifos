@@ -95,16 +95,19 @@ void main() {
           isTrue,
         );
         network.hint(false);
-        final reading = await runtime.save('readings', parcel, {
-          'nitrogen': 20,
-          'phosphorus': 10,
-          'potassium': 30,
-          'ph': 6,
-          'ec': 0.4,
-          'temperature': 24,
-          'humidity': 60,
-          'recorded_at': now.toUtc().toIso8601String(),
-        });
+        final readingPayload = config['reading_payload'] == null
+            ? {
+                'nitrogen': 20,
+                'phosphorus': 10,
+                'potassium': 30,
+                'ph': 6,
+                'ec': 0.4,
+                'temperature': 24,
+                'humidity': 60,
+                'recorded_at': now.toUtc().toIso8601String(),
+              }
+            : Map<String, dynamic>.from(config['reading_payload'] as Map);
+        final reading = await runtime.save('readings', parcel, readingPayload);
         final labPayload = Map<String, dynamic>.from(
           config['lab_payload'] as Map,
         )..remove('parcel_id');
@@ -120,6 +123,12 @@ void main() {
         open();
         expect(await runtime.authorize(user), isTrue);
         expect((await runtime.read('readings')).single['id'], reading['id']);
+        if (config['reading_payload'] != null) {
+          final restored = (await runtime.read('readings')).single;
+          expect(restored['measurement'], readingPayload['measurement']);
+          expect(restored['recorded_at'], readingPayload['recorded_at']);
+          expect(restored['humidity'], isNull);
+        }
         network.hint(true);
         await engine.synchronize();
         expect(transport.lost, isTrue);
@@ -136,6 +145,30 @@ void main() {
           (await db.operations(user)).every((op) => op['status'] == 'synced'),
           isTrue,
         );
+        if (config['reading_payload'] != null) {
+          final processed = (await runtime.read('readings')).single;
+          final results = (processed['derived_results'] as List).cast<Map>();
+          expect(results, isNotEmpty);
+          expect(results.single['reading_id'], reading['id']);
+          expect((results.single['variables'] as Map)['nitrogen'], isNotNull);
+          final original =
+              ((readingPayload['measurement'] as Map)['variables']
+                      as Map)['nitrogen']
+                  as Map;
+          final received =
+              ((processed['measurement'] as Map)['variables']
+                      as Map)['nitrogen']
+                  as Map;
+          for (final entry in original.entries) {
+            expect(received[entry.key], entry.value);
+          }
+          expect(await db.pendingProcessing(user), isEmpty);
+          await engine.synchronize();
+          expect(
+            (await runtime.read('readings')).single['derived_results'],
+            results,
+          );
+        }
         final local = (await runtime.read('lab_analyses')).single;
         expect(local['revision'], 1);
         await client.patch('/lab-analyses/${lab['id']}', {'nitrogen': 77});
@@ -168,6 +201,7 @@ void main() {
             'operation': operation,
             'lab': lab['id'],
             'initial_queued_operations': 2,
+            'deferred_processing_returned': config['reading_payload'] != null,
           }),
         );
       } finally {

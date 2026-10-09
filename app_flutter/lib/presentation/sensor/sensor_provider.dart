@@ -1,7 +1,9 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
-import '../../data/api/api_client.dart';
+import 'package:flutter_serial_communication/models/device_info.dart';
+import 'package:uuid/uuid.dart';
 import '../../data/api/readings_repository.dart';
+import '../../data/sensor/sensor_protocol.dart';
 import '../../data/sensor/usb_sensor_service.dart';
 import '../../domain/entities/reading.dart';
 import '../../domain/entities/sensor_diagnostic.dart';
@@ -11,218 +13,185 @@ enum SensorStatus { disconnected, connecting, connected, reconnecting, error }
 enum SaveStatus { idle, saving, saved, error }
 
 class SensorProvider extends ChangeNotifier {
-  final _service = UsbSensorService();
+  SensorProvider({
+    ReadingsRepository? readingsRepository,
+    UsbSensorService? service,
+  }) : _readingsRepository = readingsRepository ?? ReadingsRepository(),
+       _service = service ?? UsbSensorService();
+  final UsbSensorService _service;
   final ReadingsRepository _readingsRepository;
   SensorStatus status = SensorStatus.disconnected;
   SensorReading? lastReading;
-  String? errorMessage;
-
+  String? errorMessage =
+      'Validación física pendiente: falta el modelo, manual y perfil verificado del sensor.';
   SaveStatus saveStatus = SaveStatus.idle;
   String? saveErrorMessage;
   SensorDiagnostic? savedDiagnosis;
   Reading? savedReading;
-  int _saveGeneration = 0;
+  SensorProfile? _profile;
+  DeviceInfo? _device;
+  StreamSubscription<SensorReading>? _readings;
+  int _generation = 0;
+  bool _disposed = false;
+  (String, String, double?, String?)? _samplingKey;
+  String? _samplingSession;
 
-  SensorProvider({ReadingsRepository? readingsRepository})
-    : _readingsRepository = readingsRepository ?? ReadingsRepository() {
-    _initAutoConnect();
-  }
+  Future<List<DeviceInfo>> availableDevices() => _service.availableDevices();
 
-  static const _maxAutoRetries = 5;
-  static const _retryDelay = Duration(seconds: 3);
-  int _retryCount = 0;
-  bool _userRequestedDisconnect = false;
-  StreamSubscription<void>? _usbAttachSub;
-  StreamSubscription<void>? _nativeDisconnectSub;
-
-  /// Watches for the OTG sensor being plugged in and connects automatically,
-  /// without the user having to tap "Conectar sensor".
-  void _initAutoConnect() {
-    // Covers two startup cases: the app was cold-started because the
-    // sensor was just plugged in, or the sensor was already plugged in
-    // from an earlier session.
-    _service.consumeColdStartUsbAttach().then((coldStarted) async {
-      if (coldStarted) {
-        connectAndListen();
-        return;
-      }
-      final available = await _service.hasAvailableDevice();
-      if (available && status == SensorStatus.disconnected) {
-        connectAndListen();
-      }
-    });
-
-    // Covers the sensor being plugged in while the app is already running.
-    _usbAttachSub = _service.usbAttachEvents().listen((_) {
-      if (status == SensorStatus.disconnected || status == SensorStatus.error) {
-        _userRequestedDisconnect = false;
-        connectAndListen();
-      }
-    });
-
-    // Covers the sensor being unplugged while connected: the native layer
-    // notices the I/O error immediately, instead of waiting for the next
-    // ~2s poll to fail.
-    _nativeDisconnectSub = _service.nativeDisconnectEvents().listen((_) {
-      if (!_userRequestedDisconnect && status != SensorStatus.disconnected) {
-        _scheduleReconnect('se desconectó el sensor');
-      }
-    });
+  /// A reviewed manual/profile and an explicitly selected USB device are required.
+  /// Merely plugging in a generic adapter never sends a query.
+  Future<void> selectDevice(SensorProfile profile, DeviceInfo device) async {
+    profile.validate();
+    await disconnect();
+    _profile = profile;
+    _device = device;
+    errorMessage = null;
+    notifyListeners();
   }
 
   Future<void> connectAndListen() async {
-    _userRequestedDisconnect = false;
+    if (_disposed ||
+        status == SensorStatus.connecting ||
+        status == SensorStatus.connected) {
+      return;
+    }
+    final generation = ++_generation;
+    _clearSample();
     status = SensorStatus.connecting;
     errorMessage = null;
     notifyListeners();
-
-    final ok = await _service.connect();
-    if (!ok) {
-      status = SensorStatus.error;
-      errorMessage = 'No se detectó el sensor por OTG';
-      notifyListeners();
-      return;
-    }
-
-    _retryCount = 0;
-    status = SensorStatus.connected;
-    notifyListeners();
-
-    _service.readings().listen(
-      (reading) {
-        lastReading = reading;
-        savedDiagnosis = null;
-        savedReading = null;
-        saveStatus = SaveStatus.idle;
-        saveErrorMessage = null;
-        notifyListeners();
-      },
-      onError: (e) {
-        if (e is SensorDisconnectedException && !_userRequestedDisconnect) {
-          _scheduleReconnect(e.message);
-        } else {
-          status = SensorStatus.error;
-          errorMessage = e.toString();
-          notifyListeners();
-        }
-      },
-    );
-  }
-
-  void _scheduleReconnect(String reason) {
-    if (_retryCount >= _maxAutoRetries) {
-      status = SensorStatus.error;
-      errorMessage =
-          'Se perdió la conexión con el sensor y se agotaron los '
-          'reintentos automáticos ($_maxAutoRetries). Verifica el cable OTG '
-          'y toca "Conectar sensor" para intentar de nuevo.';
-      notifyListeners();
-      return;
-    }
-
-    _retryCount++;
-    status = SensorStatus.reconnecting;
-    errorMessage =
-        'Conexión perdida ($reason). Reintentando '
-        '($_retryCount/$_maxAutoRetries)...';
-    notifyListeners();
-
-    Timer(_retryDelay, () async {
-      if (_userRequestedDisconnect) return;
-      final ok = await _service.connect();
-      if (!ok) {
-        _scheduleReconnect('no se detectó el sensor');
-        return;
+    try {
+      await _readings?.cancel();
+      final connected = await _service.connect(
+        profile: _profile,
+        device: _device,
+      );
+      if (_disposed || generation != _generation) return;
+      if (!connected) {
+        throw SensorDisconnectedException(
+          'No se pudo conectar al dispositivo seleccionado.',
+        );
       }
-
       status = SensorStatus.connected;
-      errorMessage = null;
-      notifyListeners();
-
-      _service.readings().listen(
+      _readings = _service.readings().listen(
         (reading) {
-          _retryCount = 0;
+          if (_disposed || generation != _generation) return;
+          _clearSample();
           lastReading = reading;
-          savedDiagnosis = null;
-          savedReading = null;
-          saveStatus = SaveStatus.idle;
-          saveErrorMessage = null;
+          errorMessage = null;
           notifyListeners();
         },
-        onError: (e) {
-          if (e is SensorDisconnectedException && !_userRequestedDisconnect) {
-            _scheduleReconnect(e.message);
-          } else {
+        onError: (Object error) {
+          if (_disposed || generation != _generation) return;
+          _clearSample();
+          errorMessage = error.toString();
+          if (error is SensorDisconnectedException ||
+              error is SensorAcquisitionException &&
+                  error.code == 'device_exception') {
             status = SensorStatus.error;
-            errorMessage = e.toString();
-            notifyListeners();
           }
+          notifyListeners();
+        },
+        onDone: () {
+          if (_disposed || generation != _generation) return;
+          _clearSample();
+          status = SensorStatus.error;
+          errorMessage ??=
+              'No hay una medición válida. Reconecta el dispositivo seleccionado.';
+          notifyListeners();
         },
       );
-    });
+      notifyListeners();
+    } catch (error) {
+      if (_disposed || generation != _generation) return;
+      _clearSample();
+      status = SensorStatus.error;
+      errorMessage = error.toString();
+      notifyListeners();
+    }
   }
 
-  /// Sends [lastReading] to the backend for the given [parcelId].
-  Future<void> saveCurrentReading(String parcelId) async {
-    final reading = lastReading;
-    if (reading == null || saveStatus == SaveStatus.saving) return;
+  void _clearSample() {
+    lastReading = null;
+    savedDiagnosis = null;
+    savedReading = null;
+    saveStatus = SaveStatus.idle;
+    saveErrorMessage = null;
+  }
 
-    final generation = _saveGeneration;
+  Future<void> saveCurrentReading(
+    String parcelId, {
+    String? pointId,
+    double? depthCm,
+    String? soilType,
+  }) async {
+    final sample = lastReading;
+    if (pointId != null) {
+      final key = (parcelId, pointId.trim(), depthCm, soilType?.trim());
+      if (key != _samplingKey) {
+        _samplingKey = key;
+        _samplingSession = const Uuid().v4();
+      }
+    }
+    final reading = pointId == null
+        ? sample
+        : sample?.withSamplingContext(
+            pointId: pointId,
+            depthCm: depthCm,
+            soilType: soilType,
+            sessionId: _samplingSession,
+          );
+    if (status != SensorStatus.connected ||
+        reading == null ||
+        saveStatus == SaveStatus.saving ||
+        saveStatus == SaveStatus.saved) {
+      return;
+    }
+    final generation = _generation;
     saveStatus = SaveStatus.saving;
     saveErrorMessage = null;
     notifyListeners();
-
     try {
-      final savedReading = await _readingsRepository.submitReading(
+      final result = await _readingsRepository.submitReading(
         parcelId: parcelId,
         reading: reading,
       );
-      if (generation != _saveGeneration) return;
-      savedDiagnosis = savedReading.diagnosis;
-      this.savedReading = savedReading;
+      if (_disposed || generation != _generation || lastReading != sample) {
+        return;
+      }
+      savedDiagnosis = result.diagnosis;
+      savedReading = result;
       saveStatus = SaveStatus.saved;
       notifyListeners();
-    } on ApiAuthException catch (e) {
-      if (generation != _saveGeneration) return;
-      if (generation != _saveGeneration) return;
+    } catch (error) {
+      if (_disposed || generation != _generation || lastReading != sample) {
+        return;
+      }
       saveStatus = SaveStatus.error;
-      saveErrorMessage = e.message;
-      notifyListeners();
-    } on ApiException catch (e) {
-      if (generation != _saveGeneration) return;
-      if (generation != _saveGeneration) return;
-      saveStatus = SaveStatus.error;
-      saveErrorMessage = e.message;
-      notifyListeners();
-    } catch (e) {
-      if (generation != _saveGeneration) return;
-      saveStatus = SaveStatus.error;
-      saveErrorMessage = 'No se pudo guardar la lectura: $e';
+      saveErrorMessage = 'No se pudo guardar la lectura: $error';
       notifyListeners();
     }
   }
 
   Future<void> disconnect() async {
-    _saveGeneration++;
-    _userRequestedDisconnect = true;
-    await _service.dispose();
+    _generation++;
+    _samplingKey = null;
+    _samplingSession = null;
+    _clearSample();
     status = SensorStatus.disconnected;
-    lastReading = null;
-    savedDiagnosis = null;
-    savedReading = null;
     errorMessage = null;
-    saveStatus = SaveStatus.idle;
-    saveErrorMessage = null;
-    notifyListeners();
+    await _readings?.cancel();
+    _readings = null;
+    await _service.dispose();
+    if (!_disposed) notifyListeners();
   }
 
   @override
   void dispose() {
-    _saveGeneration++;
-    _userRequestedDisconnect = true;
-    _usbAttachSub?.cancel();
-    _nativeDisconnectSub?.cancel();
-    _service.dispose();
+    _disposed = true;
+    _generation++;
+    _readings?.cancel();
+    unawaited(_service.dispose());
     super.dispose();
   }
 }

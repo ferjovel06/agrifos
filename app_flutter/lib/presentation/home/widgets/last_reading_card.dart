@@ -68,12 +68,138 @@ class LastReadingCard extends StatelessWidget {
               const SizedBox(height: 14),
             ],
             _MetricsGrid(reading: reading!),
+            if (reading!.measurement != null) ...[
+              const SizedBox(height: 12),
+              const Text(
+                'Medición original sin validación analítica de laboratorio.',
+                style: TextStyle(fontSize: 12, color: _labelColor),
+              ),
+              if (reading!.derivedResults.isEmpty) ...[
+                _OriginalValues(measurement: reading!.measurement!),
+                const Text(
+                  'Procesamiento pendiente de sincronización.',
+                  style: TextStyle(fontSize: 12),
+                ),
+              ] else
+                _ProcessedValues(result: reading!.derivedResults.last),
+            ],
           ],
           const SizedBox(height: 16),
           _ConnectionFooter(isConnected: isSensorConnected),
         ],
       ),
     );
+  }
+}
+
+class _OriginalValues extends StatelessWidget {
+  const _OriginalValues({required this.measurement});
+  final Map<String, dynamic> measurement;
+  @override
+  Widget build(BuildContext context) {
+    final variables = measurement['variables'] as Map? ?? const {};
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        for (final entry in variables.entries)
+          if (entry.value is Map)
+            Text(
+              '${entry.value['analyte'] ?? entry.key}: original '
+              '${entry.value['raw_value'] ?? 'N/D'} ${entry.value['unit'] ?? 'unidad N/D'} · '
+              '${entry.value['read_status'] ?? 'estado N/D'}',
+              style: const TextStyle(fontSize: 11),
+            ),
+      ],
+    );
+  }
+}
+
+class _ProcessedValues extends StatelessWidget {
+  const _ProcessedValues({required this.result});
+  final Map<String, dynamic> result;
+  @override
+  Widget build(BuildContext context) {
+    final variables = result['variables'] as Map<String, dynamic>? ?? const {};
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Algoritmo: ${result['algorithm_version']} · ${result['created_at'] ?? ''}',
+          style: const TextStyle(fontSize: 11),
+        ),
+        for (final entry in variables.entries)
+          if (entry.value is Map)
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '${((entry.value as Map)['raw'] as Map?)?['analyte'] ?? entry.key}: '
+                  'original ${((entry.value as Map)['raw'] as Map?)?['value'] ?? 'N/D'} ${_unit(entry.value as Map)} · '
+                  'filtrado ${(entry.value as Map)['filtered'] ?? 'N/D'} ${_unit(entry.value as Map)} · '
+                  'calibrado ${((entry.value as Map)['calibration'] as Map?)?['value'] ?? 'N/D'} ${_unit(entry.value as Map)} · '
+                  '${(entry.value as Map)['quality_state']} / ${(entry.value as Map)['accuracy_state']}'
+                  '${(entry.value as Map)['calibration'] == null ? '' : ' · modelo ${((entry.value as Map)['calibration'] as Map)['profile_id']} v${((entry.value as Map)['calibration'] as Map)['profile_version']}'}',
+                  style: const TextStyle(fontSize: 11),
+                ),
+                for (final warning in _warnings(entry.value as Map))
+                  Text(
+                    warning,
+                    style: const TextStyle(
+                      fontSize: 11,
+                      color: Color(0xFF95511E),
+                    ),
+                  ),
+                if ((entry.value as Map)['reason_codes'] is List &&
+                    ((entry.value as Map)['reason_codes'] as List).isNotEmpty)
+                  Tooltip(
+                    message: ((entry.value as Map)['reason_codes'] as List)
+                        .join(', '),
+                    child: const Text(
+                      'Detalles de calidad disponibles',
+                      style: TextStyle(fontSize: 10),
+                    ),
+                  ),
+              ],
+            ),
+      ],
+    );
+  }
+
+  String _unit(Map value) =>
+      ((value['raw'] as Map?)?['unit'] as String?) ?? 'unidad N/D';
+
+  List<String> _warnings(Map value) {
+    final codes = value['reason_codes'] as List? ?? const [];
+    final raw = value['raw'] as Map?;
+    final warnings = <String>[];
+    if (raw?['declared_range'] == null) {
+      warnings.add('Rango del fabricante no documentado.');
+    }
+    const descriptions = {
+      'INSUFFICIENT_REPETITIONS':
+          'Repeticiones insuficientes: se conserva el original.',
+      'CENTERED_WINDOW_EDGE':
+          'Ventana incompleta en el extremo: se conserva el original.',
+      'STABILIZATION_NOT_ESTABLISHED':
+          'Tiempo de estabilización aún sin determinar.',
+      'INSUFFICIENT_STABILIZATION': 'La sonda todavía no se ha estabilizado.',
+      'OUTSIDE_DECLARED_RANGE':
+          'Valor fuera del rango declarado; requiere confirmación.',
+      'INVALID_DECLARED_RANGE':
+          'Rango declarado incompatible; requiere revisión.',
+      'TRANSMISSION_SUSPECT': 'Comunicación sospechosa; repite la medición.',
+      'TRANSMISSION_INVALID': 'Trama incompatible; no utilizar para cálculos.',
+      'MAD_OUTLIER': 'Valor atípico entre repeticiones; requiere revisión.',
+      'ABRUPT_JUMP': 'Cambio abrupto entre repeticiones; requiere revisión.',
+      'EXCESS_REPEATABILITY_DISPERSION':
+          'Dispersión elevada entre repeticiones.',
+      'PHYSICAL_CONTEXT_INCOMPLETE': 'Punto o contexto físico incompleto.',
+    };
+    for (final code in codes) {
+      final text = descriptions[code];
+      if (text != null) warnings.add(text);
+    }
+    return warnings;
   }
 }
 
@@ -185,10 +311,21 @@ class _MetricsGrid extends StatelessWidget {
     final serverPhosphorus = reading.diagnosis?.parameter('phosphorus');
     final serverPotassium = reading.diagnosis?.parameter('potassium');
     final serverPh = reading.diagnosis?.parameter('ph');
-    final nitrogenLevel = NpkThresholds.nitrogen(reading.nitrogen);
-    final phosphorusLevel = NpkThresholds.phosphorus(reading.phosphorus);
-    final potassiumLevel = NpkThresholds.potassium(reading.potassium);
-    final phLevel = classifySoilParameter(SoilParameterId.ph, reading.ph);
+    final nitrogenLevel =
+        reading.nitrogen == null || reading.measurement != null
+        ? null
+        : NpkThresholds.nitrogen(reading.nitrogen!);
+    final phosphorusLevel =
+        reading.phosphorus == null || reading.measurement != null
+        ? null
+        : NpkThresholds.phosphorus(reading.phosphorus!);
+    final potassiumLevel =
+        reading.potassium == null || reading.measurement != null
+        ? null
+        : NpkThresholds.potassium(reading.potassium!);
+    final phLevel = reading.ph == null || reading.measurement != null
+        ? null
+        : classifySoilParameter(SoilParameterId.ph, reading.ph!);
 
     return Column(
       children: [
@@ -197,7 +334,7 @@ class _MetricsGrid extends StatelessWidget {
             Expanded(
               child: _MetricTile(
                 label: 'Humedad',
-                value: '${reading.humidity.toStringAsFixed(0)}%',
+                value: _format(reading.humidity, '%'),
                 valueColor: const Color(0xFF2563EB),
                 message: 'Lectura informativa',
               ),
@@ -205,13 +342,12 @@ class _MetricsGrid extends StatelessWidget {
             Expanded(
               child: _MetricTile(
                 label: 'Nitrógeno',
-                value: '${reading.nitrogen.toStringAsFixed(0)} mg/kg',
+                value: _format(reading.nitrogen, ' mg/kg'),
                 valueColor: serverNitrogen == null
-                    ? NpkThresholds.colorFor(nitrogenLevel)
+                    ? _nutrientColor(nitrogenLevel)
                     : _colorForDiagnosticLevel(serverNitrogen.level),
                 message:
-                    serverNitrogen?.message ??
-                    NpkThresholds.messageFor(nitrogenLevel),
+                    serverNitrogen?.message ?? _nutrientMessage(nitrogenLevel),
               ),
             ),
           ],
@@ -222,25 +358,25 @@ class _MetricsGrid extends StatelessWidget {
             Expanded(
               child: _MetricTile(
                 label: 'Fósforo',
-                value: '${reading.phosphorus.toStringAsFixed(0)} mg/kg',
+                value: _format(reading.phosphorus, ' mg/kg'),
                 valueColor: serverPhosphorus == null
-                    ? NpkThresholds.colorFor(phosphorusLevel)
+                    ? _nutrientColor(phosphorusLevel)
                     : _colorForDiagnosticLevel(serverPhosphorus.level),
                 message:
                     serverPhosphorus?.message ??
-                    NpkThresholds.messageFor(phosphorusLevel),
+                    _nutrientMessage(phosphorusLevel),
               ),
             ),
             Expanded(
               child: _MetricTile(
                 label: 'Potasio',
-                value: '${reading.potassium.toStringAsFixed(0)} mg/kg',
+                value: _format(reading.potassium, ' mg/kg'),
                 valueColor: serverPotassium == null
-                    ? NpkThresholds.colorFor(potassiumLevel)
+                    ? _nutrientColor(potassiumLevel)
                     : _colorForDiagnosticLevel(serverPotassium.level),
                 message:
                     serverPotassium?.message ??
-                    NpkThresholds.messageFor(potassiumLevel),
+                    _nutrientMessage(potassiumLevel),
               ),
             ),
           ],
@@ -251,11 +387,17 @@ class _MetricsGrid extends StatelessWidget {
             Expanded(
               child: _MetricTile(
                 label: 'pH',
-                value: reading.ph.toStringAsFixed(1),
+                value: reading.ph?.toStringAsFixed(1) ?? '—',
                 valueColor: serverPh == null
-                    ? _colorForPhLevel(phLevel)
+                    ? phLevel == null
+                          ? Colors.grey
+                          : _colorForPhLevel(phLevel)
                     : _colorForDiagnosticLevel(serverPh.level, ph: true),
-                message: serverPh?.message ?? _messageForPhLevel(phLevel),
+                message:
+                    serverPh?.message ??
+                    (phLevel == null
+                        ? 'Sin calibración validada'
+                        : _messageForPhLevel(phLevel)),
               ),
             ),
             const Expanded(child: SizedBox.shrink()),
@@ -264,6 +406,14 @@ class _MetricsGrid extends StatelessWidget {
       ],
     );
   }
+
+  String _format(double? value, String unit) =>
+      value == null ? '—' : '${value.toStringAsFixed(0)}$unit';
+  Color _nutrientColor(NutrientLevel? level) =>
+      level == null ? Colors.grey : NpkThresholds.colorFor(level);
+  String _nutrientMessage(NutrientLevel? level) => level == null
+      ? 'Sin calibración validada'
+      : NpkThresholds.messageFor(level);
 
   Color _colorForPhLevel(SoilLevel level) {
     switch (level) {

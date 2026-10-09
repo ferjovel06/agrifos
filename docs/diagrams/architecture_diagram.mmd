@@ -1,5 +1,6 @@
 flowchart LR
-    Sensor["Sensor de suelo genérico 7 en 1"] -->|USB OTG Android| App["Flutter nativo offline / web online"]
+    Sensor["Sonda: modelo y alimentación pendientes"] -.->|USB OTG Android: validación física pendiente| Capture["Perfil documentado + dispositivo explícito + tramas/CRC"]
+    Capture --> App["Flutter nativo offline / web online"]
     Lab["Captura manual de laboratorio"] --> App
     App <-->|Sesión y MFA TOTP| Auth["Supabase Auth"]
     App <-->|REST y JWT| API["FastAPI: autorización por rol y finca"]
@@ -16,4 +17,8 @@ flowchart LR
     Local <--> Sync["Motor central: UUID estable, reintentos y conflictos"]
     Sync <-->|Operaciones idempotentes y cursor privado| API
     DB --- Journal["Diario, revisiones, tombstones y recibos"]
+    API --> Processing["Calidad y filtros: mismo punto, originales conservados"]
+    Processing --> Calibration["Modelos por analito: grupos independientes, ámbito y versiones"]
+    Calibration --> Evidence["Originales, pares y resultados derivados append-only"]
+    Evidence --> DB
     Climate <--> Cache["Caché HTTP y producto normalizado en PostgreSQL"]

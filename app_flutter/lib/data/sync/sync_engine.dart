@@ -100,33 +100,9 @@ class SyncEngine extends ChangeNotifier {
         if (sessionPaused || !network.operational) break;
       }
       if (sessionPaused || !_same(user) || !network.operational) return;
-      String? cursor = await database.cursor(user);
-      var resetSnapshot = false;
-      while (_same(user) && foreground) {
-        Map<String, dynamic> page;
-        try {
-          page =
-              await _authenticatedGet(
-                    '/sync/changes',
-                    user,
-                    query: {'cursor': ?cursor, 'limit': '100'},
-                  )
-                  as Map<String, dynamic>;
-        } on ApiException catch (e) {
-          if (e.statusCode != 410 || resetSnapshot || !_same(user)) rethrow;
-          resetSnapshot = true;
-          cursor = null;
-          // Reset only the expired cursor. Local entities and outbox survive.
-          await database.customStatement(
-            'UPDATE checkpoints SET cursor=NULL WHERE account=?',
-            [user],
-          );
-          continue;
-        }
-        if (!_same(user)) return;
-        await database.applyPage(user, page, clock());
-        cursor = page['cursor'] as String;
-        if (page['has_more'] != true) break;
+      await _download(user);
+      if (_same(user) && foreground && network.operational) {
+        if (await _processPending(user)) await _download(user);
       }
     } on ApiAuthException {
       sessionPaused = true;
@@ -146,6 +122,90 @@ class SyncEngine extends ChangeNotifier {
       _schedule();
       notifyListeners();
     }
+  }
+
+  Future<void> _download(String user) async {
+    String? cursor = await database.cursor(user);
+    var resetSnapshot = false;
+    while (_same(user) && foreground) {
+      Map<String, dynamic> page;
+      try {
+        page =
+            await _authenticatedGet(
+                  '/sync/changes',
+                  user,
+                  query: {'cursor': ?cursor, 'limit': '100'},
+                )
+                as Map<String, dynamic>;
+      } on ApiException catch (e) {
+        if (e.statusCode != 410 || resetSnapshot || !_same(user)) rethrow;
+        resetSnapshot = true;
+        cursor = null;
+        // Reset only the expired cursor. Local entities and outbox survive.
+        await database.customStatement(
+          'UPDATE checkpoints SET cursor=NULL WHERE account=?',
+          [user],
+        );
+        continue;
+      }
+      if (!_same(user)) return;
+      await database.applyPage(user, page, clock());
+      cursor = page['cursor'] as String;
+      if (page['has_more'] != true) break;
+    }
+  }
+
+  Future<bool> _processPending(String user) async {
+    final candidates = await database.pendingProcessing(user);
+    final seen = <String>{};
+    var processed = false, remaining = 200;
+    for (final candidate in candidates) {
+      if (!_same(user) || !foreground || !network.operational) break;
+      final group = candidate['_processing_group'] as String;
+      if (!seen.add(group)) continue;
+      final members = await database.processingGroup(user, group);
+      if (members.length > 200) {
+        error =
+            'Originales guardados. Grupo mayor de 200 muestras: requiere un lote explícito de procesamiento.';
+        continue;
+      }
+      if (members.length > remaining) {
+        error =
+            'Originales guardados. Hay procesamiento pendiente para la próxima sincronización.';
+        continue;
+      }
+      final ids = members.map((row) => row['id'] as String).toList();
+      try {
+        final results = await _withRefresh(
+          user,
+          () => client.postListForUser('/readings/process', {
+            'reading_ids': ids,
+            'window_size': 5,
+            'method': 'median',
+          }, user),
+        );
+        if (!_same(user)) return processed;
+        if (results.length != ids.length ||
+            results.map((result) => result['reading_id']).toSet().length !=
+                ids.length ||
+            results.any((result) => !ids.contains(result['reading_id']))) {
+          throw ApiException(
+            502,
+            'El procesamiento no confirmó todas las muestras.',
+          );
+        }
+        remaining -= members.length;
+        processed = true;
+      } on ApiAuthException {
+        rethrow;
+      } on ApiException catch (exception) {
+        if (exception.statusCode == 401) rethrow;
+        error =
+            'Originales guardados. Procesamiento pendiente; se reintentará al sincronizar.';
+        // Retry inferred from existing entity metadata on next user/reconnect run.
+      }
+    }
+    return processed;
   }
 
   Future<dynamic> _authenticatedGet(

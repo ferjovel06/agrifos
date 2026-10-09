@@ -12,33 +12,23 @@ class ReadingsRepository {
 
   /// Submits [reading] for the given [parcelId].
   ///
-  /// The USB sensor reports EC in µS/cm, but the backend stores and
-  /// validates EC in dS/m (0-20 range), so it's converted here
-  /// (1 dS/m = 1000 µS/cm) before sending.
+  /// Profile decoding normalizes only documented compatible units. Raw values
+  /// and acquisition time travel unchanged through the existing offline queue.
   Future<Reading> submitReading({
     required String parcelId,
     required SensorReading reading,
   }) async {
-    final payload = {
-      'parcel_id': parcelId,
-      'nitrogen': reading.nitrogen,
-      'phosphorus': reading.phosphorus,
-      'potassium': reading.potassium,
-      'ec': reading.ec / 1000,
-      'ph': reading.ph,
-      'temperature': reading.temperature,
-      'humidity': reading.humidity,
-    };
+    final payload = reading.payload();
     final runtime = OfflineRuntime.shared;
     if (runtime != null) {
       return Reading.fromJson(
-        await runtime.save('readings', parcelId, {
-          ...payload..remove('parcel_id'),
-          'recorded_at': runtime.clock().toUtc().toIso8601String(),
-        }),
+        await runtime.save('readings', parcelId, payload),
       );
     }
-    final response = await _client.post('/readings', payload);
+    final response = await _client.post('/readings', {
+      'parcel_id': parcelId,
+      ...payload,
+    });
     return Reading.fromJson(response);
   }
 
@@ -57,7 +47,9 @@ class ReadingsRepository {
             (b['recorded_at'] as String).compareTo(a['recorded_at'] as String),
       );
       final reading = Reading.fromJson(rows.first);
-      if (reading.syncStatus != 'synced') return reading;
+      if (reading.syncStatus != 'synced' || reading.measurement != null) {
+        return reading;
+      }
       try {
         final diagnosis =
             await runtime.cachedGet('/diagnostics/readings/${reading.id}')
@@ -76,6 +68,7 @@ class ReadingsRepository {
     final list = (response as List).cast<Map<String, dynamic>>();
     if (list.isEmpty) return null;
     final reading = Reading.fromJson(list.first);
+    if (reading.measurement != null) return reading;
     final diagnosisResponse = await _client.get(
       '/diagnostics/readings/${reading.id}',
     );

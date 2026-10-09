@@ -9,6 +9,25 @@ import '../local/offline_database.dart';
 import '../local/secure_vault.dart';
 import 'sync_engine.dart';
 
+/// Server serialization may reorder maps and include absent optional nulls.
+/// Lists, non-null values and sampling context remain immutable evidence.
+bool _sameMeasurement(Object? left, Object? right) {
+  if (left is Map && right is Map) {
+    return {
+      ...left.keys,
+      ...right.keys,
+    }.every((key) => _sameMeasurement(left[key], right[key]));
+  }
+  if (left is List && right is List) {
+    if (left.length != right.length) return false;
+    for (var index = 0; index < left.length; index++) {
+      if (!_sameMeasurement(left[index], right[index])) return false;
+    }
+    return true;
+  }
+  return left == right;
+}
+
 class OfflineRuntime extends ChangeNotifier {
   OfflineRuntime({
     required this.database,
@@ -335,13 +354,33 @@ class OfflineRuntime extends ChangeNotifier {
         );
       }
     }
-    final entityId = id ?? const Uuid().v4();
+    final acquisitionId = kind == 'readings'
+        ? payload['measurement_id'] as String?
+        : null;
+    if (acquisitionId != null) {
+      final existing = await database.entity(user, kind, acquisitionId);
+      if (existing != null) {
+        if (existing['parcel_id'] != parcelId ||
+            !_sameMeasurement(
+              existing['measurement'],
+              payload['measurement'],
+            )) {
+          throw StateError(
+            'El identificador de medición ya corresponde a otra captura.',
+          );
+        }
+        return existing;
+      }
+    }
+    final entityId = id ?? acquisitionId ?? const Uuid().v4();
     final values = {'parcel_id': parcelId, ...payload};
     final local = {
       'id': entityId,
       ...values,
       'recorded_at':
-          previous?['recorded_at'] ?? clock().toUtc().toIso8601String(),
+          previous?['recorded_at'] ??
+          payload['recorded_at'] ??
+          clock().toUtc().toIso8601String(),
       'revision': previous?['revision'],
       '_sync_status': 'pending',
     };
@@ -373,13 +412,41 @@ class OfflineRuntime extends ChangeNotifier {
     }
 
     if (kind == 'readings') {
-      for (final key in ['nitrogen', 'phosphorus', 'potassium']) {
-        range(key, 0, 1000);
+      // API bounds apply to legacy readings, not documented raw sensor ranges.
+      void optionalRange(String key, double low, double high) {
+        if (data['measurement'] == null) {
+          range(key, low, high);
+        } else if (data[key] != null &&
+            (data[key] is! num || !(data[key] as num).isFinite)) {
+          throw ArgumentError('Valor inválido: $key');
+        }
       }
-      range('ec', 0, 20);
-      range('ph', 2, 10);
-      range('temperature', -10, 60);
-      range('humidity', 0, 100);
+
+      for (final key in ['nitrogen', 'phosphorus', 'potassium']) {
+        optionalRange(key, 0, 1000);
+      }
+      optionalRange('ec', 0, 20);
+      optionalRange('ph', 2, 10);
+      optionalRange('temperature', -10, 60);
+      optionalRange('humidity', 0, 100);
+      if (data['measurement'] == null &&
+          [
+            'nitrogen',
+            'phosphorus',
+            'potassium',
+            'ec',
+            'ph',
+            'temperature',
+            'humidity',
+          ].every((key) => data[key] == null)) {
+        throw ArgumentError('No hay variables medidas.');
+      }
+      if (data['recorded_at'] != null) {
+        final time = DateTime.tryParse(data['recorded_at'] as String);
+        if (time == null || time.year < 2000 || time.isAfter(clock())) {
+          throw ArgumentError('Fecha de adquisición inválida.');
+        }
+      }
     } else {
       for (final key in [
         'sample_code',

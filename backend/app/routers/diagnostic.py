@@ -51,6 +51,12 @@ async def diagnose_reading(
             detail="Not enough permissions.",
         )
 
+    if getattr(reading, "measurement", None) is not None:
+        raise HTTPException(status_code=422, detail={
+            "code": "sensor_agronomic_reference_unvalidated",
+            "message": "Retrieve technical quality and calibrated estimates from /readings/{id}/results; nutrient classification requires a documented comparable agronomic method.",
+        })
+
     try:
         config = await get_active_engine_config(db, parcel.crop_id)
         return diagnose_sensor_reading(reading, parcel.crop.name, config)

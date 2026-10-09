@@ -1,5 +1,5 @@
 classDiagram
-    %% Persisted SQLAlchemy classes: offline-first proposal from main 8182f9f.
+    %% Persisted SQLAlchemy classes at feat/npk-measurement-reliability 19df436.
     class AuthUser {
         uuid id
     }
@@ -57,16 +57,55 @@ classDiagram
     class Reading {
         int revision
         uuid parcel_id
-        float nitrogen
-        float phosphorus
-        float potassium
-        float ec
-        float ph
-        float temperature
-        float humidity
+        float nitrogen optional
+        float phosphorus optional
+        float potassium optional
+        float ec optional
+        float ph optional
+        float temperature optional
+        float humidity optional
+        jsonb measurement optional
+        jsonb derived_results
+        datetime received_at optional
         datetime recorded_at
         uuid id
     }
+    %% Legacy readings require seven values; unknown historical reception stays null.
+    %% Canonical originals/results/pairs are immutable; derived_results is a cache projection.
+    class ReadingResult {
+        uuid id
+        uuid reading_id
+        string fingerprint
+        string algorithm_version
+        uuid calibration_id optional
+        jsonb payload
+        datetime created_at
+    }
+    class CalibrationPairRecord {
+        uuid id
+        uuid user_id
+        uuid reading_id
+        string sample_id
+        string context_key optional
+        string variable
+        jsonb laboratory
+        datetime created_at
+    }
+    class SensorCalibration {
+        uuid id
+        uuid user_id
+        string profile_id
+        int version
+        string state
+        jsonb profile
+        jsonb pair_ids
+        jsonb validation optional
+        datetime created_at
+    }
+    %% Composite uniqueness: ReadingResult(reading_id,fingerprint),
+    %% CalibrationPairRecord(user_id,reading_id,variable), SensorCalibration(user_id,profile_id,version).
+    %% SensorCalibration state: candidate/validated/retired; profile and validation evidence are immutable.
+    %% pair_ids stores application-checked references in JSONB, not relational FKs.
     class LabAnalysis {
         int revision
         uuid parcel_id
@@ -291,6 +330,11 @@ classDiagram
     Crop "1..1" --> "0..*" Variety : crop_id
     Parcel "1..1" --> "0..*" Reading : parcel_id
     Parcel "1..1" --> "0..*" LabAnalysis : parcel_id
+    Reading "1" --> "0..*" ReadingResult : reading_id
+    Reading "1" --> "0..*" CalibrationPairRecord : reading_id
+    User "1" --> "0..*" CalibrationPairRecord : user_id
+    User "1" --> "0..*" SensorCalibration : user_id
+    SensorCalibration "0..1" --> "0..*" ReadingResult : calibration_id
     Crop "1..1" --> "0..*" PhenologicalStageTemplate : crop_id
     Parcel "1..1" --> "0..*" ParcelPhenologicalStage : parcel_id
     PhenologicalStageTemplate "1..1" --> "0..*" ParcelPhenologicalStage : template_id

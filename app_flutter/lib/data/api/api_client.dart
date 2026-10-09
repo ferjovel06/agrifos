@@ -78,6 +78,35 @@ class ApiClient {
     Map<String, dynamic> body, {
     String? expectedUser,
   }) async {
+    final decoded = await _postDecoded(path, body, expectedUser: expectedUser);
+    if (decoded is! Map<String, dynamic>) {
+      throw ApiException(
+        502,
+        'El servidor devolvió una confirmación inválida.',
+      );
+    }
+    return decoded;
+  }
+
+  Future<List<Map<String, dynamic>>> postListForUser(
+    String path,
+    Map<String, dynamic> body,
+    String user,
+  ) async {
+    final decoded = await _postDecoded(path, body, expectedUser: user);
+    if (decoded is! List ||
+        decoded.length > 200 ||
+        decoded.any((row) => row is! Map<String, dynamic>)) {
+      throw ApiException(502, 'El servidor devolvió resultados inválidos.');
+    }
+    return decoded.cast<Map<String, dynamic>>();
+  }
+
+  Future<dynamic> _postDecoded(
+    String path,
+    Map<String, dynamic> body, {
+    String? expectedUser,
+  }) async {
     final headers = await _headers();
     if (expectedUser != null &&
         (userProvider != null
@@ -89,11 +118,7 @@ class ApiClient {
     final response = await _send(
       _http.post(_uri(path), headers: headers, body: jsonEncode(body)),
     );
-    final decoded = _decode(response);
-    if (decoded is! Map<String, dynamic>) {
-      throw ApiException(502, 'El servidor devolvió una confirmación inválida.');
-    }
-    return decoded;
+    return _decode(response);
   }
 
   Future<dynamic> get(String path, {Map<String, String>? query}) async {

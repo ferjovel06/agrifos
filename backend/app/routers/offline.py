@@ -65,7 +65,11 @@ async def apply_operation(
     if payload.operation == "create":
         if record is not None or payload.expected_revision is not None:
             raise HTTPException(409, {"code": "entity_exists"})
-        record = model(id=payload.entity_id, **values.model_dump(exclude_none=True))
+        try:
+            record_values = values.orm_values(entity_id=payload.entity_id) if model is Reading else {"id": payload.entity_id, **values.model_dump(exclude_none=True)}
+        except ValueError as error:
+            raise HTTPException(422, str(error)) from error
+        record = model(**record_values)
         db.add(record)
     else:
         if record is None:

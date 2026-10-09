@@ -2,6 +2,7 @@ from app.models.user import User
 from app.models.farm import Farm, Parcel
 from app.models.crop import Crop, Variety
 from app.models.soil import Reading, LabAnalysis
+from app.models.measurement import ReadingResult, CalibrationPairRecord, SensorCalibration
 from app.models.phenology import PhenologicalStageTemplate, ParcelPhenologicalStage
 from app.models.fertilization_engine import (
     OptimalRequirement,
@@ -30,6 +31,9 @@ __all__ = [
     "Crop",
     "Variety",
     "Reading",
+    "ReadingResult",
+    "CalibrationPairRecord",
+    "SensorCalibration",
     "LabAnalysis",
     "PhenologicalStageTemplate",
     "ParcelPhenologicalStage",

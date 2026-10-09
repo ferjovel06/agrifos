@@ -7,7 +7,7 @@ Base verificable: `origin/main` en `8182f9f`; ampliación propuesta en `feat/off
 | Offline-first (rama de propuesta) | SQLite cifrado, cola durable, sync idempotente, revisión de conflictos y clima guardado | Android/device acceptance pendiente; scope detallado en [guía](offline-first.md) |
 | Identidad | Supabase Auth, perfil, roles, MFA TOTP | Credenciales y servicios externos requeridos |
 | Finca y parcelas | Registro/consulta/edición, cultivo, variedad, densidad y etapa | Catálogo de cultivos no equivale a motores validados para todos |
-| Sensor | Lecturas siete parámetros y comunicación OTG en Flutter | Hardware físico y compatibilidad requieren verificación; no curva automática NPK calibrada |
+| Sensor (propuesta dependiente del PR #82) | Perfil/documentación y dispositivo explícitos, parser acotado, procedencia parcial, calidad, filtros agrupados y calibración versionada | Hardware y precisión frente a laboratorio NOT RUN; no perfil físico ni coeficientes productivos activados. [Guía](sensor-measurements.md) |
 | Laboratorio | Captura NPK, Ca/Mg/S, pH, CE, MO, CIC, textura y métodos | Balance productivo solo N/P₂O₅/K₂O |
 | Fertilización | Escenarios minerales, plan joven, snapshots y recuperación | Apoyo a decisiones, no garantía agronómica |
 | Orgánico | Bocashi, Biol, Compost de pulpa y balance total comparativo | Referencia parcial; sin aplicación aprobada ni calendario ejecutable |
