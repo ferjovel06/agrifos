@@ -1,5 +1,6 @@
 import asyncio
 import logging
+from datetime import datetime, timezone
 from typing import Any
 
 import jwt
@@ -13,6 +14,8 @@ from app.core.tokens import verify_access_token
 from app.db.session import get_db
 from app.models import User
 from app.repositories import user as user_repo
+from app.repositories.auth_management import get_account
+from app.services.auth import check_account_access
 
 bearer_scheme = HTTPBearer()
 
@@ -97,6 +100,21 @@ async def get_current_user(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid authentication level.",
         )
+
+    if settings.AUTH_PROVIDER == "native":
+        account = await get_account(db, user_id, lock=False)
+        if account is None:
+            raise HTTPException(401, "Tu sesión venció. Inicia sesión de nuevo.")
+        credential, user = account
+        check_account_access(credential, datetime.now(timezone.utc))
+        issued_at = claims.get("iat")
+        if not isinstance(issued_at, (int, float)) or (
+            credential.tokens_valid_after and issued_at <= credential.tokens_valid_after.timestamp()
+        ):
+            raise HTTPException(401, "Tu sesión venció. Inicia sesión de nuevo.")
+        if credential.mfa_enabled and aal != "aal2":
+            raise HTTPException(403, "Completa la verificación en dos pasos.")
+        return user
 
     # Preserve the current opt-in MFA behavior.
     if aal != "aal2":

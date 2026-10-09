@@ -8,7 +8,7 @@ from app.models import AuthCredential, AuthMfaChallenge, AuthMfaFactor, User
 
 async def get_login_factor(db: AsyncSession, user_id: UUID) -> AuthMfaFactor | None:
     result = await db.execute(
-        select(AuthMfaFactor).where(AuthMfaFactor.user_id == user_id)
+        select(AuthMfaFactor).where(AuthMfaFactor.user_id == user_id, AuthMfaFactor.verified.is_(True))
         .order_by(AuthMfaFactor.id).limit(1)
     )
     return result.scalar_one_or_none()

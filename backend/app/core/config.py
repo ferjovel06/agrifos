@@ -25,6 +25,19 @@ class Settings(BaseSettings):
     AUTH_MFA_CHALLENGE_SECONDS: int = Field(default=300, gt=0)
     AUTH_MAX_MFA_ATTEMPTS: int = Field(default=5, gt=0)
     AUTH_MFA_LOCK_SECONDS: int = Field(default=300, gt=0)
+    AUTH_MFA_ENROLLMENT_SECONDS: int = Field(default=600, gt=0)
+    AUTH_MFA_ISSUER: str = "Agrifos"
+    AUTH_PASSWORD_MIN_LENGTH: int = Field(default=12, ge=8, le=1024)
+    AUTH_EMAIL_TOKEN_SECONDS: int = Field(default=1800, gt=0)
+    AUTH_EMAIL_COOLDOWN_SECONDS: int = Field(default=60, gt=0)
+    AUTH_EMAIL_REDIRECT_URL: str = "dev.agrifos.agrifos://auth-callback/"
+    SMTP_HOST: str = ""
+    SMTP_PORT: int = Field(default=587, gt=0, le=65535)
+    SMTP_SECURITY: Literal["starttls", "ssl"] = "starttls"
+    SMTP_USERNAME: str = ""
+    SMTP_PASSWORD: SecretStr = SecretStr("")
+    SMTP_FROM: str = ""
+    SMTP_TIMEOUT_SECONDS: float = Field(default=10, gt=0)
     WEATHER_TIMEOUT_SECONDS: float = Field(default=15.0, gt=0)
     WEATHER_CONNECT_TIMEOUT_SECONDS: float = Field(default=5.0, gt=0)
     WEATHER_REQUEST_ATTEMPTS: int = Field(default=2, ge=1)

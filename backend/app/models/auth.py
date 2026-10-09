@@ -19,6 +19,7 @@ class AuthCredential(Base):
     locked_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     mfa_failed_attempts: Mapped[int] = mapped_column(Integer, default=0, server_default=text("0"))
     mfa_locked_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    tokens_valid_after: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
 class AuthMfaFactor(Base):
@@ -28,6 +29,20 @@ class AuthMfaFactor(Base):
     user_id: Mapped[UUID] = mapped_column(ForeignKey("auth_credentials.user_id", ondelete="CASCADE"), index=True)
     secret_ciphertext: Mapped[str] = mapped_column(String)
     last_verified_counter: Mapped[int | None] = mapped_column(BigInteger)
+    verified: Mapped[bool] = mapped_column(Boolean, default=False, server_default=text("false"))
+    enrollment_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class AuthEmailToken(Base):
+    __tablename__ = "auth_email_tokens"
+
+    digest: Mapped[str] = mapped_column(String(64), primary_key=True)
+    user_id: Mapped[UUID] = mapped_column(ForeignKey("auth_credentials.user_id", ondelete="CASCADE"), index=True)
+    purpose: Mapped[str] = mapped_column(String(20))
+    password_fingerprint: Mapped[str] = mapped_column(String(64))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    consumed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
 class AuthMfaChallenge(Base):

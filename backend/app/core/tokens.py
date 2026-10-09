@@ -14,8 +14,8 @@ def create_access_token(user: User, *, aal: Literal["aal1", "aal2"] = "aal1") ->
         {
             "sub": str(user.id),
             "email": user.email,
-            "iat": now,
-            "exp": now + timedelta(seconds=settings.AUTH_ACCESS_TOKEN_SECONDS),
+            "iat": now.timestamp(),
+            "exp": (now + timedelta(seconds=settings.AUTH_ACCESS_TOKEN_SECONDS)).timestamp(),
             "iss": settings.AUTH_JWT_ISSUER,
             "aud": settings.AUTH_JWT_AUDIENCE,
             "jti": str(uuid4()),

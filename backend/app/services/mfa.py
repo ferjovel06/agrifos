@@ -19,7 +19,7 @@ def password_fingerprint(stored_hash: str) -> str:
 
 async def start_login_challenge(db: AsyncSession, credential: AuthCredential) -> AuthMfaChallenge:
     now = datetime.now(timezone.utc)
-    _check_mfa_lock(credential, now)
+    check_mfa_lock(credential, now)
     factor = await get_login_factor(db, credential.user_id)
     if factor is None:
         raise HTTPException(503, "No se pudo preparar la verificación en dos pasos.")
@@ -40,11 +40,11 @@ async def verify_login_challenge(db: AsyncSession, challenge_id: UUID, code: str
     challenge, credential, factor, user = account
     now = datetime.now(timezone.utc)
     _validate_challenge(challenge, credential, now)
-    _check_mfa_lock(credential, now)
+    check_mfa_lock(credential, now)
     check_account_access(credential, now)
-    counter = _matching_counter(factor, code, now)
+    counter = matching_counter(factor, code, now)
     if counter is None:
-        await _record_mfa_failure(db, credential, now)
+        await record_mfa_failure(db, credential, now)
         raise HTTPException(401, "El código no es válido o ya fue utilizado.")
     factor.last_verified_counter = counter
     challenge.consumed_at = now
@@ -67,12 +67,12 @@ def _invalid_challenge() -> HTTPException:
     return HTTPException(401, "La verificación venció o no es válida. Inicia sesión de nuevo.")
 
 
-def _check_mfa_lock(credential: AuthCredential, now: datetime):
+def check_mfa_lock(credential: AuthCredential, now: datetime):
     if credential.mfa_locked_until and credential.mfa_locked_until > now:
         raise HTTPException(429, "Demasiados intentos de verificación. Intenta de nuevo más tarde.")
 
 
-def _matching_counter(factor: AuthMfaFactor, code: str, now: datetime) -> int | None:
+def matching_counter(factor: AuthMfaFactor, code: str, now: datetime) -> int | None:
     try:
         cipher = Fernet(settings.AUTH_MFA_ENCRYPTION_KEY.get_secret_value().encode())
         secret = cipher.decrypt(factor.secret_ciphertext.encode()).decode()
@@ -90,7 +90,7 @@ def _matching_counter(factor: AuthMfaFactor, code: str, now: datetime) -> int | 
     return None
 
 
-async def _record_mfa_failure(db: AsyncSession, credential: AuthCredential, now: datetime):
+async def record_mfa_failure(db: AsyncSession, credential: AuthCredential, now: datetime):
     if credential.mfa_locked_until and credential.mfa_locked_until <= now:
         credential.mfa_failed_attempts = 0
         credential.mfa_locked_until = None

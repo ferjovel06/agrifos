@@ -15,7 +15,7 @@ from app.repositories.auth import get_login_account
 _dummy_hash = password_hash.hash(secrets.token_urlsafe(32))
 
 
-async def authenticate_user(db: AsyncSession, email: str, password: str) -> tuple[User, AuthCredential]:
+async def authenticate_user(db: AsyncSession, email: str, password: str, *, commit: bool = True) -> tuple[User, AuthCredential]:
     account = await get_login_account(db, email)
     credential, user = account if account else (None, None)
     now = datetime.now(timezone.utc)
@@ -37,7 +37,8 @@ async def authenticate_user(db: AsyncSession, email: str, password: str) -> tupl
     credential.locked_until = None
     if updated_hash:
         credential.password_hash = updated_hash
-    await db.commit()
+    if commit:
+        await db.commit()
     return user, credential
 
 
