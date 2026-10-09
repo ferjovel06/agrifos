@@ -3,6 +3,9 @@
 Fecha: 2026-10-08, Guatemala. PR existente: [#76](https://github.com/ferjovel06/agrifos/pull/76).
 Rama: `chore/docker-environment`. **Draft; no se recomienda merge mientras el gate de seguridad siga en FAIL.**
 La aceptación humana de Android y el APK siguen pendientes; esta fase no los ejecuta.
+Main avanzó nuevamente durante esta tarea. El resultado más reciente es la incorporación
+de `3583b7d` y **156 pruebas backend PASS**, documentada en la actualización al final.
+Los resultados 151 de la primera resolución se conservan como evidencia de esa etapa.
 
 ## Causa del conflicto y resolución
 
@@ -106,3 +109,45 @@ images sigue devolviendo error por los HIGH. No cambió ningún workflow ni crit
 seguridad en esta fase. Recomendación: conservar el Draft/gate y esperar correcciones
 Trixie compatibles. Cualquier excepción específica requiere una decisión humana previa,
 con CVE, paquetes/digest, alcance, controles, responsable, vencimiento y retirada.
+
+## Actualización por nuevos cambios de main durante la validación
+
+Después del primer push, el remoto main avanzó a `3583b7d`: PR #78 de caché
+meteorológica (`6462ad8`/`769ec71`) y PR #79 de artefactos de desarrollo
+(`a95e365`, `b558c82`, `d47d3f4`/`3583b7d`). GitHub aún mostraba dirty y no ejecutó
+workflows nuevos sobre b55642e. Se inspeccionó/fusionó ese estado mediante otro merge
+normal, sin reescribir la primera resolución.
+
+El único conflicto nuevo fue .gitignore, por dos bloques añadidos al final del archivo.
+Se conservó su unión: .docker/, .tools/, artifacts/, supabase/.local/ y bytecode Docker,
+además de /backend/tools/, /app_flutter/tool/ y /app_flutter/web/ de main. git check-ignore
+comprobó ambos grupos; ninguno de los archivos privados de esos directorios está staged.
+Las eliminaciones de demos/notas y sus referencias son cambios ya publicados en main,
+incorporados sin borrar archivos personales, datos o historia Git.
+
+config.py se fusionó automáticamente conservando JWKS y los siete ajustes meteorológicos.
+Los tres nuevos son WEATHER_CACHE_FRESH_SECONDS=1800, WEATHER_CACHE_STALE_SECONDS=21600
+y WEATHER_CACHE_RETRY_SECONDS=60, con gt=0. Las tres regresiones se ampliaron a todos los
+campos; los overrides positivos respetan stale >= fresh, exigido por la caché de main.
+Se conservó la caché compartida por proceso y sus cinco pruebas nuevas.
+
+El segundo merge es `06cae7e886dc74f2690188e4883b302c23eae230`, padres b55642e y 3583b7d.
+git merge-tree origin/main HEAD devolvió exactamente el árbol HEAD, sin conflictos.
+Ambos main incorporados y el HEAD Docker original 3995d11 siguen siendo ancestros.
+
+| Revalidación de main 3583b7d | Resultado real | Evidencia privada |
+|---|---|---|
+| Backend Windows y Docker | PASS, 156 pruebas en cada uno | backend-native-main3583.log y backend-docker-main3583.log |
+| Infraestructura y validación estática | PASS, 39 pruebas; sin errores Hadolint | infrastructure-main3583.log y static-main3583.log |
+| Integración real y persistencia completa | PASS, proyecto nuevo agrifos-it-e941513d | integration-main3583.log; volúmenes conservados |
+| Auth/JWT/MFA, Alembic y loopback Windows antes/después | PASS | mismo driver |
+| Árbol staged sin secretos | PASS, cero hallazgos | tracked-secrets-283eb0825348.json |
+| Trivy del runtime nuevo | FAIL, 44 HIGH/0 CRITICAL; config=0/image=1/identity=0 | trivy-main3583.log y public-scanner-summary-main3583.json |
+
+Las 156 pruebas son 133 originales, 20 meteorológicas incorporadas de main y tres de
+configuración nuevas. El digest de configuración del runtime nuevo es
+`sha256:e59b4dc689d7b26c52b889e2c9f4c5bde550afa04a7a265a345116e41e4e8ef6`,
+verificado contra el archivo escaneado. Los ocho CVE/paquetes/versiones no cambiaron;
+los secretos y misconfiguraciones HIGH/CRITICAL reportados siguen en cero.
+No cambió auth.py, ningún lockfile, migración histórica, workflow o política Trivy.
+Los resultados de los cinco jobs para el HEAD publicado definitivo se registran en el PR #76.

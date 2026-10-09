@@ -2,7 +2,7 @@
 
 Fecha: 2026-10-08. Rama: `chore/docker-environment`.
 Este informe recoge la entrega inicial. La incorporación posterior del PR #77 de main,
-la resolución de config.py y las 151 pruebas backend constan en el
+la resolución de config.py/.gitignore y las 156 pruebas backend constan en el
 [informe del conflicto del PR #76](docker-pr76-merge.md).
 **Estado: INCOMPLETO. No se recomienda merge.** Alembic y la integración real están
 resueltos; Trixie fue adoptada bajo autorización. Trivy continúa en FAIL, y la
