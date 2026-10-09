@@ -19,6 +19,8 @@ class LostAcknowledgementClient extends http.BaseClient {
     if (!lost &&
         request.method == 'POST' &&
         request.url.path == '/sync/operations' &&
+        request is http.Request &&
+        (jsonDecode(request.body) as Map)['entity'] == 'readings' &&
         response.statusCode == 200) {
       await response.stream.drain<void>();
       lost = true;
@@ -103,7 +105,16 @@ void main() {
           'humidity': 60,
           'recorded_at': now.toUtc().toIso8601String(),
         });
-        final operation = (await db.operations(user)).single['operation_id'];
+        final labPayload = Map<String, dynamic>.from(
+          config['lab_payload'] as Map,
+        )..remove('parcel_id');
+        final lab = await runtime.save('lab_analyses', parcel, labPayload);
+        final queued = await db.operations(user);
+        expect(queued.length, 2);
+        expect(queued.every((op) => op['status'] == 'pending'), isTrue);
+        final operation = queued.firstWhere(
+          (op) => op['entity_id'] == reading['id'],
+        )['operation_id'];
         engine.dispose();
         await db.close();
         open();
@@ -112,18 +123,19 @@ void main() {
         network.hint(true);
         await engine.synchronize();
         expect(transport.lost, isTrue);
-        expect((await db.operations(user)).single['status'], 'retry_wait');
+        expect(
+          (await db.operations(
+            user,
+          )).firstWhere((op) => op['operation_id'] == operation)['status'],
+          'retry_wait',
+        );
         now = now.add(const Duration(minutes: 20));
         network.hint(true);
         await Future.wait([engine.synchronize(), engine.synchronize()]);
-        expect((await db.operations(user)).single['status'], 'synced');
-        network.hint(false);
-        final labPayload = Map<String, dynamic>.from(
-          config['lab_payload'] as Map,
-        )..remove('parcel_id');
-        final lab = await runtime.save('lab_analyses', parcel, labPayload);
-        network.hint(true);
-        await engine.synchronize();
+        expect(
+          (await db.operations(user)).every((op) => op['status'] == 'synced'),
+          isTrue,
+        );
         final local = (await runtime.read('lab_analyses')).single;
         expect(local['revision'], 1);
         await client.patch('/lab-analyses/${lab['id']}', {'nitrogen': 77});
@@ -155,6 +167,7 @@ void main() {
             'reading': reading['id'],
             'operation': operation,
             'lab': lab['id'],
+            'initial_queued_operations': 2,
           }),
         );
       } finally {

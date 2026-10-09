@@ -68,10 +68,14 @@ def main():
             async with fixture.sessions() as db:
                 records = (await db.execute(text("SELECT count(*) FROM readings WHERE id=CAST(:id AS uuid)"), {"id":result["reading"]})).scalar()
                 receipts = (await db.execute(text("SELECT count(*) FROM sync_receipts WHERE user_id=CAST(:user AS uuid) AND operation_id=CAST(:id AS uuid)"), {"user":str(fixture.user),"id":result["operation"]})).scalar()
+                lab_records = (await db.execute(text("SELECT count(*) FROM lab_analyses WHERE id=CAST(:id AS uuid)"), {"id":result["lab"]})).scalar()
                 value = (await db.execute(text("SELECT nitrogen FROM lab_analyses WHERE id=CAST(:id AS uuid)"), {"id":result["lab"]})).scalar()
                 assert records == receipts == 1, (records, receipts)
                 assert value == 77, value
+                assert lab_records == 1
+                assert result["initial_queued_operations"] == 2
                 return {"status":"PASS", "reading_records":records,"operation_receipts":receipts,
+                        "lab_records":lab_records,"initial_queued_operations":2,
                         "remote_lab_nitrogen":value,"lost_response_replayed":True,"sqlite_reopened":True,
                         "real_http":True,"real_postgresql":True,"jwt_es256":True,"conflict_review":True}
         evidence = asyncio.run(verify())
