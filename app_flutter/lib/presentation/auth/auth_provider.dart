@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
-import 'package:supabase_flutter/supabase_flutter.dart' hide AuthException;
 
 import 'package:app_flutter/data/api/auth_repository.dart';
 import 'package:app_flutter/domain/entities/app_user.dart';
@@ -20,12 +19,14 @@ enum AuthStatus {
 
 class AuthProvider extends ChangeNotifier {
   final AuthRepository _repository;
-  late final StreamSubscription<AuthState> _authSubscription;
+  late final StreamSubscription<AuthEvent> _authSubscription;
 
   AuthProvider(this._repository) {
     _authSubscription = _repository.authStateChanges.listen(_handleAuthState);
     _refreshAuthState();
   }
+
+  bool get supportsAccountManagement => _repository.supportsAccountManagement;
 
   AuthStatus status = AuthStatus.idle;
   AppUser? user;
@@ -42,10 +43,10 @@ class AuthProvider extends ChangeNotifier {
   bool _offerMfaEnrollment = false;
   bool _passwordRecoveryActive = false;
 
-  void _handleAuthState(AuthState authState) {
-    if (authState.event == AuthChangeEvent.passwordRecovery) {
+  void _handleAuthState(AuthEvent event) {
+    if (event == AuthEvent.passwordRecovery) {
       _passwordRecoveryActive = true;
-    } else if (authState.event == AuthChangeEvent.signedIn) {
+    } else if (event == AuthEvent.signedIn) {
       emailConfirmationRequired = false;
       pendingConfirmationEmail = null;
       _offerMfaEnrollment = true;
@@ -55,15 +56,17 @@ class AuthProvider extends ChangeNotifier {
 
   Future<void> _refreshAuthState() async {
     user = _repository.currentUser;
-    if (user == null) {
+    if (_repository.requiresMfaVerification) {
+      status = AuthStatus.mfaRequired;
+    } else if (user == null) {
       status = AuthStatus.idle;
       mfaEnabled = null;
     } else if (_passwordRecoveryActive) {
       status = AuthStatus.passwordRecovery;
     } else {
-      if (_repository.requiresMfaVerification) {
-        status = AuthStatus.mfaRequired;
-      } else if (_offerMfaEnrollment && !_repository.hasVerifiedMfaFactor) {
+      if (_offerMfaEnrollment &&
+          supportsAccountManagement &&
+          !_repository.hasVerifiedMfaFactor) {
         status = AuthStatus.mfaEnrollmentOffered;
       } else {
         status = AuthStatus.authenticated;
@@ -133,7 +136,7 @@ class AuthProvider extends ChangeNotifier {
       await _refreshAuthState();
       return true;
     } catch (e) {
-      status = AuthStatus.mfaRequired;
+      await _refreshAuthState();
       errorMessage = e is AuthException
           ? e.message
           : 'No se pudo verificar el código.';
@@ -341,11 +344,13 @@ class AuthProvider extends ChangeNotifier {
     emailConfirmationRequired = false;
     pendingConfirmationEmail = null;
     await _repository.signOut();
+    await _refreshAuthState();
   }
 
   @override
   void dispose() {
     _authSubscription.cancel();
+    _repository.dispose();
     super.dispose();
   }
 }

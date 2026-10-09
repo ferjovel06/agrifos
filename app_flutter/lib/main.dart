@@ -6,7 +6,10 @@ import 'package:google_fonts/google_fonts.dart';
 
 import 'core/env.dart';
 import 'core/supabase_http_client.dart';
+import 'data/api/api_client.dart';
 import 'data/api/auth_repository.dart';
+import 'data/api/native_auth_repository.dart';
+import 'data/api/supabase_auth_repository.dart';
 import 'presentation/auth/auth_provider.dart';
 import 'presentation/auth/auth_gate.dart';
 import 'presentation/farm/farm_provider.dart';
@@ -19,11 +22,13 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await dotenv.load(fileName: '.env');
 
-  await Supabase.initialize(
-    url: Env.supabaseUrl,
-    publishableKey: Env.supabasePublishableKey,
-    httpClient: SupabaseHttpClient(),
-  );
+  if (Env.authProvider == 'supabase') {
+    await Supabase.initialize(
+      url: Env.supabaseUrl,
+      publishableKey: Env.supabasePublishableKey,
+      httpClient: SupabaseHttpClient(),
+    );
+  }
 
   runApp(const AgrifosApp());
 }
@@ -35,7 +40,16 @@ class AgrifosApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MultiProvider(
       providers: [
-        ChangeNotifierProvider(create: (_) => AuthProvider(AuthRepository())),
+        ChangeNotifierProvider(
+          lazy: false,
+          create: (_) {
+            final AuthRepository repository = Env.authProvider == 'native'
+                ? NativeAuthRepository()
+                : SupabaseAuthRepository();
+            ApiClient.defaultTokenProvider = () => repository.accessToken;
+            return AuthProvider(repository);
+          },
+        ),
         ChangeNotifierProvider(create: (_) => SensorProvider()),
         ChangeNotifierProvider(create: (_) => LatestReadingProvider()),
         ChangeNotifierProvider(create: (_) => WeatherProvider()),

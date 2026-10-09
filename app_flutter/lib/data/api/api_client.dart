@@ -2,7 +2,6 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:http/http.dart' as http;
-import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../core/env.dart';
 
@@ -16,7 +15,7 @@ class ApiException implements Exception {
   String toString() => message;
 }
 
-/// Thrown when there is no authenticated Supabase session to attach.
+/// Thrown when there is no authenticated session to attach.
 class ApiAuthException implements Exception {
   final String message;
   ApiAuthException(this.message);
@@ -26,18 +25,22 @@ class ApiAuthException implements Exception {
 }
 
 /// Small wrapper around [http.Client] that talks to the Agrifos FastAPI
-/// backend, attaching the current Supabase session's JWT as a Bearer token
+/// backend, attaching the current session's JWT as a Bearer token
 /// and mapping error responses to [ApiException].
 class ApiClient {
+  void close() => _http.close();
+  static String? Function() defaultTokenProvider = () => null;
   final http.Client _http;
+  final String? Function()? tokenProvider;
+  final String? baseUrl;
 
-  ApiClient({http.Client? httpClient}) : _http = httpClient ?? http.Client();
+  ApiClient({http.Client? httpClient, this.tokenProvider, this.baseUrl})
+    : _http = httpClient ?? http.Client();
 
-  Uri _uri(String path) => Uri.parse('${Env.apiBaseUrl}$path');
+  Uri _uri(String path) => Uri.parse('${baseUrl ?? Env.apiBaseUrl}$path');
 
   Future<Map<String, String>> _headers() async {
-    final session = Supabase.instance.client.auth.currentSession;
-    final token = session?.accessToken;
+    final token = (tokenProvider ?? defaultTokenProvider)();
     if (token == null) {
       throw ApiAuthException(
         'No hay una sesión activa. Inicia sesión de nuevo.',
@@ -52,8 +55,18 @@ class ApiClient {
   Future<Map<String, dynamic>> post(
     String path,
     Map<String, dynamic> body,
+  ) async => _post(path, body, await _headers());
+
+  Future<Map<String, dynamic>> postPublic(
+    String path,
+    Map<String, dynamic> body,
+  ) async => _post(path, body, {'Content-Type': 'application/json'});
+
+  Future<Map<String, dynamic>> _post(
+    String path,
+    Map<String, dynamic> body,
+    Map<String, String> headers,
   ) async {
-    final headers = await _headers();
     final response = await _send(
       _http.post(_uri(path), headers: headers, body: jsonEncode(body)),
     );

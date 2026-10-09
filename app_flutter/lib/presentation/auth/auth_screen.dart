@@ -146,6 +146,7 @@ class _AuthCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final managed = context.watch<AuthProvider>().supportsAccountManagement;
     return Container(
       transform: Matrix4.translationValues(0, -20, 0),
       padding: const EdgeInsets.fromLTRB(20, 20, 20, 28),
@@ -155,50 +156,54 @@ class _AuthCard extends StatelessWidget {
       ),
       child: Column(
         children: [
-          Container(
-            decoration: BoxDecoration(
-              color: Colors.grey.shade100,
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: TabBar(
-              controller: tabController,
-              indicatorSize: TabBarIndicatorSize.tab,
-              indicatorPadding: const EdgeInsets.all(4),
-              indicator: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(10),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.08),
-                    blurRadius: 4,
-                  ),
+          if (managed)
+            Container(
+              decoration: BoxDecoration(
+                color: Colors.grey.shade100,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: TabBar(
+                controller: tabController,
+                indicatorSize: TabBarIndicatorSize.tab,
+                indicatorPadding: const EdgeInsets.all(4),
+                indicator: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(10),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.08),
+                      blurRadius: 4,
+                    ),
+                  ],
+                ),
+                labelColor: Colors.black87,
+                unselectedLabelColor: Colors.grey,
+                labelStyle: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
+                ),
+                unselectedLabelStyle: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                ),
+                dividerColor: Colors.transparent,
+                tabs: const [
+                  Tab(text: '🔑 Iniciar Sesión'),
+                  Tab(text: '📝 Crear Cuenta'),
                 ],
               ),
-              labelColor: Colors.black87,
-              unselectedLabelColor: Colors.grey,
-              labelStyle: const TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w700,
-              ),
-              unselectedLabelStyle: const TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w500,
-              ),
-              dividerColor: Colors.transparent,
-              tabs: const [
-                Tab(text: '🔑 Iniciar Sesión'),
-                Tab(text: '📝 Crear Cuenta'),
-              ],
             ),
-          ),
           const SizedBox(height: 20),
-          AnimatedBuilder(
-            animation: tabController,
-            builder: (context, _) => IndexedStack(
-              index: tabController.index,
-              children: const [_LoginForm(), _RegisterForm()],
+          if (!managed)
+            const _LoginForm()
+          else
+            AnimatedBuilder(
+              animation: tabController,
+              builder: (context, _) => IndexedStack(
+                index: tabController.index,
+                children: const [_LoginForm(), _RegisterForm()],
+              ),
             ),
-          ),
         ],
       ),
     );
@@ -285,17 +290,18 @@ class _LoginFormState extends State<_LoginForm> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               const FieldLabel('CONTRASEÑA'),
-              TextButton(
-                onPressed: isLoading ? null : _forgotPassword,
-                style: TextButton.styleFrom(
-                  padding: EdgeInsets.zero,
-                  minimumSize: Size.zero,
+              if (auth.supportsAccountManagement)
+                TextButton(
+                  onPressed: isLoading ? null : _forgotPassword,
+                  style: TextButton.styleFrom(
+                    padding: EdgeInsets.zero,
+                    minimumSize: Size.zero,
+                  ),
+                  child: const Text(
+                    '¿Olvidaste?',
+                    style: TextStyle(fontSize: 12),
+                  ),
                 ),
-                child: const Text(
-                  '¿Olvidaste?',
-                  style: TextStyle(fontSize: 12),
-                ),
-              ),
             ],
           ),
           TextFormField(
@@ -323,15 +329,17 @@ class _LoginFormState extends State<_LoginForm> {
             },
           ),
           const SizedBox(height: 8),
-          Row(
-            children: [
-              Checkbox(
-                value: _rememberSession,
-                onChanged: (v) => setState(() => _rememberSession = v ?? false),
-              ),
-              const Text('Recordar sesión', style: TextStyle(fontSize: 13)),
-            ],
-          ),
+          if (auth.supportsAccountManagement)
+            Row(
+              children: [
+                Checkbox(
+                  value: _rememberSession,
+                  onChanged: (v) =>
+                      setState(() => _rememberSession = v ?? false),
+                ),
+                const Text('Recordar sesión', style: TextStyle(fontSize: 13)),
+              ],
+            ),
           const SizedBox(height: 4),
           FilledButton(
             style: FilledButton.styleFrom(
