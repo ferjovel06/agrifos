@@ -1,17 +1,23 @@
-FROM python:3.13-slim-trixie AS base
+FROM python:3.13-alpine AS base
 
+RUN apk upgrade --no-cache && apk add --no-cache libpq
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PATH="/app/.venv/bin:$PATH"
 WORKDIR /app
 
 FROM base AS dependencies
+RUN apk add --no-cache build-base postgresql-dev
 COPY --from=ghcr.io/astral-sh/uv:0.12.2 /uv /usr/local/bin/uv
 COPY pyproject.toml uv.lock .python-version ./
 RUN uv sync --locked --no-dev --no-install-project
 
 FROM base AS runtime
-RUN useradd --uid 10001 --create-home agrifos
+# Installation tools belong to the build stage, not the application runtime.
+RUN python -m pip uninstall -y pip \
+    && rm -rf /usr/local/lib/python3.13/ensurepip \
+    && addgroup -g 10001 agrifos \
+    && adduser -D -u 10001 -G agrifos agrifos
 COPY --from=dependencies /app/.venv /app/.venv
 COPY app ./app
 COPY alembic ./alembic

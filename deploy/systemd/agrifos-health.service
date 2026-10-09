@@ -1,0 +1,16 @@
+[Unit]
+Description=Agrifos API and database availability check
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=agrifos
+Group=agrifos
+Environment=HEALTH_BASE_URL=http://127.0.0.1:8080
+ExecStart=/usr/bin/bash /opt/agrifos/deploy/check-health.sh
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+TimeoutStartSec=30
