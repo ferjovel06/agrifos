@@ -4,11 +4,13 @@ from pathlib import Path
 import re
 import sys
 
-def audit(records, project):
+def audit(records, project, api_service="api"):
     if not re.fullmatch(r"agrifos-it-[0-9a-f]{8}", project):
         raise ValueError("invalid integration project")
+    if api_service not in ("api", "api-runtime"):
+        raise ValueError("invalid API service")
     expected = {f"/supabase_{service}_{project}" for service in ("db", "auth", "kong", "inbucket")}
-    expected.add(f"/{project}-api-1")
+    expected.add(f"/{project}-{api_service}-1")
     if {record["name"] for record in records} != expected or len(records) != len(expected):
         raise ValueError("incomplete or foreign container inventory")
     count = 0
@@ -33,7 +35,7 @@ def audit(records, project):
 if __name__ == "__main__":
     try:
         records = [json.loads(line) for line in Path(sys.argv[1]).read_text(encoding="utf-8").splitlines()]
-        count = audit(records, sys.argv[2])
+        count = audit(records, sys.argv[2], sys.argv[3] if len(sys.argv) > 3 else "api")
     except (OSError, ValueError, KeyError, TypeError, IndexError):
         raise SystemExit("FAIL: incomplete inventory or unsafe published port evidence") from None
     print(f"PASS: {len(records)} containers inspected; {count} published ports restricted to 127.0.0.1.")

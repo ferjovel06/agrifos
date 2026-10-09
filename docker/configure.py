@@ -29,6 +29,7 @@ def main(output=None):
     parser.add_argument("--port", type=int, default=54321)
     parser.add_argument("--api-port", type=int, default=8000)
     parser.add_argument("--integration", action="store_true")
+    parser.add_argument("--api-service", choices=("api", "api-runtime"), default="api")
     args = parser.parse_args()
     if not args.project.startswith("agrifos") or not args.project.replace("-", "").isalnum():
         raise SystemExit("Unexpected local project identity.")
@@ -54,7 +55,7 @@ def main(output=None):
     write_new(output / "backend.env", {"DATABASE_URL": container_database, "SUPABASE_URL": public_url, "SUPABASE_JWKS_URL": f"{internal_url}/auth/v1/.well-known/jwks.json", "ENV": "development", "APP_DEBUG": "false"})
     write_new(output / "client.env", {"SUPABASE_URL": f"http://10.0.2.2:{args.port}", "SUPABASE_PUBLISHABLE_KEY": publishable, "API_BASE_URL": f"http://10.0.2.2:{args.api_port}"})
     if args.integration:
-        write_new(output / "integration.env", {"LOCAL_SUPABASE_URL": internal_url, "LOCAL_ANON_KEY": publishable, "LOCAL_SERVICE_ROLE_KEY": status["SERVICE_ROLE_KEY"], "API_BASE_URL": "http://api:8000", "LOCAL_TEST_PROJECT": args.project})
+        write_new(output / "integration.env", {"LOCAL_SUPABASE_URL": internal_url, "LOCAL_ANON_KEY": publishable, "LOCAL_SERVICE_ROLE_KEY": status["SERVICE_ROLE_KEY"], "API_BASE_URL": f"http://{args.api_service}:8000", "LOCAL_TEST_PROJECT": args.project})
 
 
 if __name__ == "__main__":

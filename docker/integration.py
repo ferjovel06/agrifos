@@ -24,7 +24,7 @@ def validate_local_targets(environment):
         raise SystemExit("Refusing integration outside a dedicated agrifos-it-* project.")
     base = environment.get("LOCAL_SUPABASE_URL", "")
     api = environment.get("API_BASE_URL", "")
-    if base != f"http://supabase_kong_{project}:8000" or api != "http://api:8000":
+    if base != f"http://supabase_kong_{project}:8000" or api not in ("http://api:8000", "http://api-runtime:8000"):
         raise SystemExit("Refusing Auth/API destinations outside this isolated Docker project.")
     database = urlsplit(environment.get("DATABASE_URL", ""))
     if database.scheme != "postgresql+asyncpg" or database.hostname != f"supabase_db_{project}" or database.port != 5432 or database.path != "/postgres" or database.query or database.fragment:

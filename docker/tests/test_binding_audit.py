@@ -23,6 +23,18 @@ class BindingAuditTests(unittest.TestCase):
     def test_accepts_complete_loopback_inventory(self):
         self.assertEqual(audit(self.records(), PROJECT), 4)
 
+    def test_runtime_inventory_requires_the_selected_service_and_same_project(self):
+        records = self.records()
+        records[-1]["name"] = f"/{PROJECT}-api-runtime-1"
+        self.assertEqual(audit(records, PROJECT, "api-runtime"), 4)
+        with self.assertRaises(ValueError):
+            audit(records, PROJECT)
+        with self.assertRaises(ValueError):
+            audit(records, PROJECT, "foreign")
+        records[-1]["name"] = "/agrifos-it-00000000-api-runtime-1"
+        with self.assertRaises(ValueError):
+            audit(records, PROJECT, "api-runtime")
+
     def test_rejects_wildcard_ipv4_ipv6_and_lan(self):
         for address in ("", "0.0.0.0", "::", "192.168.1.4"):
             for field in ("requested", "actual"):

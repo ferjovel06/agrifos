@@ -123,6 +123,16 @@ class LocalConfigurationTests(unittest.TestCase):
             {"backend.env", "client.env"},
         )
 
+    def test_runtime_integration_uses_only_the_existing_runtime_service(self):
+        self.run_configuration(None, "--integration", "--api-service", "api-runtime")
+        integration = (self.output / "integration.env").read_text(encoding="utf-8")
+        self.assertIn("API_BASE_URL='http://api-runtime:8000'", integration)
+
+    def test_rejects_arbitrary_api_service_before_creating_credentials(self):
+        with self.assertRaises(SystemExit):
+            self.run_configuration(None, "--integration", "--api-service", "remote.example")
+        self.assertEqual(list(self.output.iterdir()), [])
+
     def test_rejects_remote_or_wrong_protocol_database_before_creating_files(self):
         for url in (
             "postgresql://postgres:test-only-password@remote.example:5432/postgres",

@@ -116,6 +116,8 @@ jobs:
         run: bash scripts/install-supabase.sh
 
       - name: Exercise real local Auth, migration and restart persistence
+        env:
+          AGRIFOS_INTEGRATION_VARIANT: runtime
         run: bash scripts/test-docker-integration.sh
 
   flutter-tools:

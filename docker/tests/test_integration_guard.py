@@ -53,6 +53,13 @@ class IntegrationIsolationTests(unittest.TestCase):
     def test_rejects_remote_application_api(self):
         self.reject(API_BASE_URL="https://api.remote.example")
 
+    def test_accepts_runtime_service_and_rejects_similar_external_names(self):
+        environment = {**LOCAL_ENVIRONMENT, "API_BASE_URL": "http://api-runtime:8000"}
+        self.assertEqual(self.integration.validate_local_targets(environment)[2], environment["API_BASE_URL"])
+        for url in ("http://api-runtime.remote:8000", "http://api-runtime:8000/", "http://api-runtime:8080"):
+            with self.subTest(url=url):
+                self.reject(API_BASE_URL=url)
+
     def test_rejects_remote_database_even_with_a_valid_test_project_name(self):
         self.reject(
             DATABASE_URL="postgresql+asyncpg://postgres:test-only-password@remote.example:5432/postgres",

@@ -9,8 +9,10 @@ native_path() {
 variant="${AGRIFOS_INTEGRATION_VARIANT:-current}"
 compose_files=(--file "$(native_path "$repo_root/compose.yaml")")
 test_image=agrifos-backend:test
+api_service=api
 case "$variant" in
   current) ;;
+  runtime) api_service=api-runtime ;;
   trixie)
     mkdir -p .docker/evaluation
     cat > .docker/evaluation/compose-trixie.yaml <<'YAML'
@@ -32,7 +34,7 @@ compose() { docker compose --project-directory "$(native_path "$repo_root")" "${
 docker info >/dev/null
 [[ -x .tools/supabase/supabase.exe ]] && cli=.tools/supabase/supabase.exe || cli=.tools/supabase/supabase
 [[ -x "$cli" ]] || { printf 'Install the pinned local CLI first.\n' >&2; exit 1; }
-if [[ "$variant" == current ]]; then compose build backend-unit api migrate; fi
+if [[ "$variant" == current || "$variant" == runtime ]]; then compose build backend-unit "$api_service" migrate; fi
 test_id="agrifos-it-$(od -An -N4 -tx1 /dev/urandom | tr -d ' \n')"
 export AGRIFOS_ENV_DIR=".docker/integration/$test_id"
 export AGRIFOS_NETWORK="$test_id"
@@ -53,7 +55,7 @@ printf 'Isolated integration project: %s (ports 54331–54334 and API 8010).\n' 
 cleanup() {
   result=$?
   trap - EXIT
-  if ! compose -p "$test_id" stop api migrate; then printf 'Cleanup: API stop failed; resources preserved.\n' >&2; result=1; fi
+  if ! compose -p "$test_id" stop "$api_service" migrate; then printf 'Cleanup: API stop failed; resources preserved.\n' >&2; result=1; fi
   if ! bash scripts/supabase-local.sh stop; then printf 'Cleanup: Supabase stop failed; resources preserved.\n' >&2; result=1; fi
   exit "$result"
 }
@@ -63,7 +65,7 @@ capture_bindings() {
   local containers=()
   while IFS= read -r item; do [[ -z "$item" ]] || containers+=("$item"); done < <(
     docker ps --filter "label=com.supabase.cli.project=$test_id" --format '{{.Names}}')
-  item="$(compose -p "$test_id" ps -q api)"
+  item="$(compose -p "$test_id" ps -q "$api_service")"
   [[ -n "$item" ]] || { printf 'FAIL: API container is missing.\n' >&2; return 1; }
   containers+=("$item")
   docker inspect --format '{"name":{{json .Name}},"image":{{json .Image}},"requested":{{json .HostConfig.PortBindings}},"actual":{{json .NetworkSettings.Ports}}}' \
@@ -71,7 +73,7 @@ capture_bindings() {
   docker run --rm --network none --user "${AGRIFOS_UID:-1000}:${AGRIFOS_GID:-1000}" \
     --mount "type=bind,source=$(native_path "$AGRIFOS_SUPABASE_WORKDIR"),target=/evidence,readonly" \
     --mount "type=bind,source=$(native_path "$repo_root/docker/audit_bindings.py"),target=/audit.py,readonly" \
-    "$test_image" python /audit.py "/evidence/bindings-$phase.jsonl" "$test_id"
+    "$test_image" python /audit.py "/evidence/bindings-$phase.jsonl" "$test_id" "$api_service"
   if [[ "$(uname -s)" == MINGW* || "$(uname -s)" == MSYS* ]]; then
     powershell.exe -NoProfile -File "$(native_path "$repo_root/docker/audit_windows_listeners.ps1")" \
       -OutputPath "$(native_path "$AGRIFOS_SUPABASE_WORKDIR/windows-listeners-$phase.json")"
@@ -85,23 +87,23 @@ export SUPABASE_ENV=development
   --user "${AGRIFOS_UID:-1000}:${AGRIFOS_GID:-1000}" \
   --mount "type=bind,source=$(native_path "$AGRIFOS_SUPABASE_WORKDIR"),target=/output" \
   --mount "type=bind,source=$(native_path "$repo_root/docker/configure.py"),target=/configure.py,readonly" \
-  "$test_image" python /configure.py --project "$test_id" --port 54331 --api-port 8010 --integration
-compose -p "$test_id" up -d --wait --wait-timeout 180 api
+  "$test_image" python /configure.py --project "$test_id" --port 54331 --api-port 8010 --integration --api-service "$api_service"
+compose -p "$test_id" up -d --wait --wait-timeout 180 "$api_service"
 capture_bindings initial
 compose -p "$test_id" run --rm --no-deps integration python /checks/integration.py initial
-compose -p "$test_id" exec -T api alembic current
+compose -p "$test_id" exec -T "$api_service" alembic current
 migration_check_status=0
-compose -p "$test_id" exec -T api alembic check || migration_check_status=$?
+compose -p "$test_id" exec -T "$api_service" alembic check || migration_check_status=$?
 compose -p "$test_id" run --rm --no-deps integration python /checks/schema_check.py
-compose -p "$test_id" exec -T api python -c \
+compose -p "$test_id" exec -T "$api_service" python -c \
   'import os; from pathlib import Path; assert os.geteuid() == 10001; status=Path("/proc/self/status").read_text(); assert "NoNewPrivs:\t1" in status; assert "CapBnd:\t0000000000000000" in status; print("PASS: API UID 10001, no-new-privileges and zero capability bound.")'
-compose -p "$test_id" stop api migrate
+compose -p "$test_id" stop "$api_service" migrate
 bash scripts/supabase-local.sh stop
 bash scripts/supabase-local.sh start
 compose -p "$test_id" run --rm --no-deps migrate
-compose -p "$test_id" up -d --wait --wait-timeout 180 api
+compose -p "$test_id" up -d --wait --wait-timeout 180 "$api_service"
 capture_bindings persistence
-compose -p "$test_id" exec -T api alembic check || migration_check_status=$?
+compose -p "$test_id" exec -T "$api_service" alembic check || migration_check_status=$?
 compose -p "$test_id" run --rm --no-deps integration python /checks/schema_check.py
 compose -p "$test_id" run --rm --no-deps integration python /checks/integration.py persistence
 compose -p "$test_id" run --rm --no-deps integration python /checks/integration.py cleanup
