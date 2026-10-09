@@ -130,15 +130,16 @@ Las credenciales y JWT de fixture no se incorporan al repositorio.
 | Compilación Python y Alembic head único | PASS | Compilación y head `1a2b3c4d5e6f` |
 | `alembic check` | FAIL | Drift heredado de #82: `auth.users`, índice agronómico y dos FK `RESTRICT` |
 | Lockfiles y cambios de migraciones históricas | PASS | Sin modificaciones respecto de `532ad74` |
+| Trivy, secretos del snapshot versionado | PASS | Cero hallazgos sobre `2822a31`; no es un escaneo CVE |
 | USB/permisos Android/CRC auténtico | NOT RUN | Sin sensor, teléfono ni tramas reales |
 | Keychain y ejecución SQLite en teléfono Android | NOT RUN | La fixture usa clave de prueba en memoria y SQLite nativa Linux |
 | Build Android, licencias y firma | NOT RUN | No se aceptan licencias ni se modifican keystores |
 | Supabase Auth en vivo | NOT RUN | La integración usa JWT ES256/JWKS reales de fixture local |
 | Exactitud frente a laboratorio | NOT RUN | Sin muestras pareadas auténticas |
-| CI del PR dependiente | NOT RUN | Pendiente de publicación; se actualizará con el resultado observado |
+| CI del PR dependiente | PASS | Tres checks completados sobre `2822a31`, en Ubuntu; enlaces debajo |
 
 El mismo `FAIL` se reprodujo con el checkout original de `532ad74` y una segunda
-base aislada nueva, sin modificar ese checkout. Los siete hallazgos son iguales;
+base aislada nueva, sin modificar ese checkout. Las categorías y operaciones son iguales;
 no corresponden a columnas/tablas nuevas de sensor. No se
 oculta ni se corrige alterando migraciones históricas en esta tarea. Los logs de
 fallos iniciales de instrumentación se preservan junto a los reruns aprobados.
@@ -149,6 +150,14 @@ JSON; no representan latencia de USB, SQLite Android, red ni laboratorio.
 La ejecución local combina Python 3.13.5 en Windows, Flutter 3.44.9/Dart 3.12.2
 en Linux y PostgreSQL 17 en un contenedor propio. El puerto de PostgreSQL es
 `127.0.0.1:52967`; no se borraron las bases ni recursos de validación.
+
+CI completada en GitHub para `2822a31`:
+[Backend tests](https://github.com/ferjovel06/agrifos/actions/runs/37897726258/job/113712822285),
+[Flutter checks](https://github.com/ferjovel06/agrifos/actions/runs/37897726258/job/113712822665) y
+[SQLite HTTP PostgreSQL acceptance](https://github.com/ferjovel06/agrifos/actions/runs/37897726098/job/113712821777).
+El último job conserva logs y JSON sanitizados en el artefacto
+`offline-acceptance-results`. El commit de cierre solo actualiza documentación;
+el código probado permanece igual.
 
 ### Uso, archivos y Git
 
@@ -170,13 +179,18 @@ adquisición Flutter, sincronización, integración/CI y documentación.
 | `7e1d857` | Infraestructura PostgreSQL, drivers HTTP y CI |
 | `f0acdec` | Perfil USB verificado, procedencia y UI |
 | `5e4b629` | Procesamiento diferido y migración local segura |
+| `2822a31` | Informe, campaña, diagramas y evidencia sanitizada |
 
 El commit de documentación que contiene este informe registra la campaña,
 arquitectura, diagramas y evidencia; la entrega del PR/CI se registra por separado.
+El commit final se titula `docs(sensor): record dependent PR and CI acceptance`.
 
-Estado de PR/Git: pendiente de publicación del PR dependiente contra
-`feat/offline-first-foundation`. No se fusiona ni despliega. La rama Docker,
+Entrega: [PR #85](https://github.com/ferjovel06/agrifos/pull/85), abierto como
+borrador dependiente contra `feat/offline-first-foundation`. No se fusiona ni
+despliega. La rama Docker,
 el checkout original, `main`, PR #76 y la rama del PR #82 se mantienen intactos.
+Se verificó que los checkouts originales permanecen limpios en `46f7003`
+(Docker) y `532ad74` (offline). Solo esta rama nueva se subió a `origin`.
 
 ## 5. Pendientes humanos
 

@@ -515,6 +515,10 @@
     {
       "sha": "5e4b6296b72e25080aeee0e0892fed0ce95de5cc",
       "subject": "feat(offline): process raw sensor sessions through the existing sync engine"
+    },
+    {
+      "sha": "2822a3112e0f710bbf19f29605672fa96aceef53",
+      "subject": "docs(sensor): record software evidence and pending physical calibration"
     }
   ],
   "not_run": [
@@ -524,8 +528,77 @@
     "laboratory accuracy and uncertainty"
   ],
   "publication": {
-    "status": "NOT RUN",
+    "number": 85,
+    "url": "https://github.com/ferjovel06/agrifos/pull/85",
+    "state": "open",
+    "draft": true,
     "base": "feat/offline-first-foundation",
-    "draft_planned": true
+    "head": "feat/npk-measurement-reliability",
+    "head_sha": "2822a3112e0f710bbf19f29605672fa96aceef53",
+    "merged": false,
+    "checks": [
+      {
+        "name": "Flutter checks",
+        "status": "completed",
+        "conclusion": "success",
+        "url": "https://github.com/ferjovel06/agrifos/actions/runs/37897726258/job/113712822665"
+      },
+      {
+        "name": "Backend tests",
+        "status": "completed",
+        "conclusion": "success",
+        "url": "https://github.com/ferjovel06/agrifos/actions/runs/37897726258/job/113712822285"
+      },
+      {
+        "name": "SQLite HTTP PostgreSQL acceptance",
+        "status": "completed",
+        "conclusion": "success",
+        "url": "https://github.com/ferjovel06/agrifos/actions/runs/37897726098/job/113712821777"
+      }
+    ],
+    "mergeable_state": "clean"
+  },
+  "secret_scan": {
+    "status": "PASS",
+    "findings": 0,
+    "snapshot": "2822a3112e0f710bbf19f29605672fa96aceef53",
+    "report_sha256": "d88e9ccb697cccedf5d92f47cfc4d0fd356174e542f52b93e9809b321fee79e8"
+  },
+  "preserved_checkouts": [
+    {
+      "branch": "chore/docker-environment",
+      "head": "46f7003c53afc5b510baaef98ae12c9d3914b530",
+      "clean": true
+    },
+    {
+      "branch": "feat/offline-first-foundation",
+      "head": "532ad74c919bc0b620b4b20f1d0d7e568a8d20b6",
+      "clean": true
+    }
+  ],
+  "ci": {
+    "status": "PASS",
+    "tested_head": "2822a3112e0f710bbf19f29605672fa96aceef53",
+    "checks": [
+      {
+        "name": "Flutter checks",
+        "status": "completed",
+        "conclusion": "success",
+        "url": "https://github.com/ferjovel06/agrifos/actions/runs/37897726258/job/113712822665"
+      },
+      {
+        "name": "Backend tests",
+        "status": "completed",
+        "conclusion": "success",
+        "url": "https://github.com/ferjovel06/agrifos/actions/runs/37897726258/job/113712822285"
+      },
+      {
+        "name": "SQLite HTTP PostgreSQL acceptance",
+        "status": "completed",
+        "conclusion": "success",
+        "url": "https://github.com/ferjovel06/agrifos/actions/runs/37897726098/job/113712821777"
+      }
+    ],
+    "artifact_name": "offline-acceptance-results"
   }
 }
