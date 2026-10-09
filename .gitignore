@@ -20,6 +20,7 @@ app_flutter/.env
 
 # Environment variables
 .env
+deploy/backend.env
 
 # Data analysis
 data_analysis/
