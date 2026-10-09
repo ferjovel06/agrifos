@@ -1,0 +1,63 @@
+name: Container validation
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  containers:
+    runs-on: ubuntu-latest
+    env:
+      POSTGRES_PASSWORD: validation-only
+      DATABASE_URL: postgresql+asyncpg://postgres:validation-only@db:5432/agrifos
+      API_ENV_FILE: deploy/backend.env
+    steps:
+      - uses: actions/checkout@v6
+      - name: Prepare isolated validation environment
+        run: |
+          cp deploy/backend.env.example deploy/backend.env
+          docker compose -f compose.yaml -f compose.production.yaml config --quiet
+      - name: Run backend tests without network
+        run: |
+          docker build --target test -t agrifos-backend:test backend
+          docker run --rm --network none agrifos-backend:test
+      - name: Validate merged services and isolation
+        run: |
+          docker compose -f compose.yaml -f compose.production.yaml up -d --build --wait --wait-timeout 120
+          docker compose -f compose.yaml -f compose.production.yaml exec -T proxy nginx -t
+          docker compose -f compose.yaml -f compose.production.yaml exec -T api python -c "import os; assert os.getuid() == 10001; from app.core.config import settings; assert settings.ENV == 'production' and not settings.APP_DEBUG"
+          curl --fail --max-time 10 http://127.0.0.1:8080/health
+          curl --fail --max-time 10 http://127.0.0.1:8080/health/db
+      - name: Scan deployment images
+        id: scan
+        continue-on-error: true
+        run: |
+          mkdir -p reports "$RUNNER_TEMP/trivy-cache"
+          status=0
+          for image in agrifos-backend:production agrifos-nginx:production agrifos-postgres:production; do
+            report="${image//[:\/]/-}"
+            docker save "$image" -o /tmp/agrifos-image.tar
+            if ! docker run --rm -v /tmp/agrifos-image.tar:/image.tar:ro -v "$PWD/reports:/reports" -v "$RUNNER_TEMP/trivy-cache:/root/.cache/trivy" aquasec/trivy:latest image --input /image.tar --format json --output "/reports/$report.json" --exit-code 1 --severity HIGH,CRITICAL --scanners vuln; then
+              status=1
+            fi
+          done
+          exit "$status"
+      - name: Preserve vulnerability reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: container-vulnerability-reports
+          path: reports/*.json
+          retention-days: 7
+          if-no-files-found: warn
+      - name: Enforce vulnerability gate
+        if: ${{ always() && steps.scan.outcome == 'failure' }}
+        run: |
+          echo 'Container scanning failed. Review the vulnerability reports artifact.' >&2
+          exit 1
+      - name: Stop disposable CI environment
+        if: always()
+        run: docker compose -f compose.yaml -f compose.production.yaml down -v
