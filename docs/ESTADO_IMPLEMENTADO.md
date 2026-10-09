@@ -1,9 +1,10 @@
 # Estado implementado de Ágrifos
 
-Base verificable: `main` en `f986ccb`, merge PR #74; revisión 8 de octubre de 2026. Describe el repositorio, sin afirmar que el despliegue o APK publicado ya usa ese commit.
+Base verificable: `origin/main` en `8182f9f`; ampliación propuesta en `feat/offline-first-foundation`, octubre de 2026. Describe el repositorio, sin afirmar que el despliegue o APK publicado ya usa ese commit.
 
 | Módulo | Integrado | Límite actual |
 |---|---|---|
+| Offline-first (rama de propuesta) | SQLite cifrado, cola durable, sync idempotente, revisión de conflictos y clima guardado | Android/device acceptance pendiente; scope detallado en [guía](offline-first.md) |
 | Identidad | Supabase Auth, perfil, roles, MFA TOTP | Credenciales y servicios externos requeridos |
 | Finca y parcelas | Registro/consulta/edición, cultivo, variedad, densidad y etapa | Catálogo de cultivos no equivale a motores validados para todos |
 | Sensor | Lecturas siete parámetros y comunicación OTG en Flutter | Hardware físico y compatibilidad requieren verificación; no curva automática NPK calibrada |

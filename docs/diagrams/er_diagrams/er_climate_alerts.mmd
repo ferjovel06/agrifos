@@ -4,6 +4,7 @@ erDiagram
     FARM ||--o{ ALERT : farm_id
     PARCEL o|--o{ ALERT : parcel_id
     FARM {
+        int revision
         uuid user_id FK
         string name
         float area_hectares
@@ -14,6 +15,7 @@ erDiagram
         datetime updated_at
     }
     PARCEL {
+        int revision
         uuid farm_id FK
         uuid crop_id FK
         uuid variety_id FK "nullable"

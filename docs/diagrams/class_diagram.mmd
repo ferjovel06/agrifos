@@ -1,5 +1,5 @@
 classDiagram
-    %% Persisted SQLAlchemy classes at main f986ccb; 2026-10-08.
+    %% Persisted SQLAlchemy classes: offline-first proposal from main 8182f9f.
     class AuthUser {
         uuid id
     }
@@ -18,6 +18,7 @@ classDiagram
         datetime updated_at
     }
     class Farm {
+        int revision
         uuid user_id
         string name
         float area_hectares
@@ -28,6 +29,7 @@ classDiagram
         datetime updated_at
     }
     class Parcel {
+        int revision
         uuid farm_id
         uuid crop_id
         uuid variety_id optional
@@ -53,6 +55,7 @@ classDiagram
         datetime updated_at
     }
     class Reading {
+        int revision
         uuid parcel_id
         float nitrogen
         float phosphorus
@@ -65,6 +68,7 @@ classDiagram
         uuid id
     }
     class LabAnalysis {
+        int revision
         uuid parcel_id
         string sample_code optional
         datetime sampled_at optional
@@ -321,3 +325,40 @@ classDiagram
     Farm "1..1" --> "0..*" Income : farm_id
     Farm "1..1" --> "0..*" Production : farm_id
     Income "0..1" --> "0..*" Production : income_id
+
+    class SyncChange {
+        bigint sequence
+        uuid user_id
+        uuid farm_id
+        string entity
+        uuid entity_id
+        string operation
+        jsonb data
+    }
+    class SyncReceipt {
+        uuid user_id
+        uuid operation_id
+        string request_hash
+        jsonb response
+        datetime created_at
+    }
+    class SyncCursor {
+        uuid id
+        uuid user_id
+        bigint after_sequence
+        bigint until_sequence optional
+        datetime expires_at
+    }
+    class WeatherHttpCache {
+        string key
+        jsonb payload optional
+        string last_modified optional
+        datetime fetched_at optional
+        datetime validated_at optional
+        datetime fresh_until optional
+        datetime retry_at optional
+        int failures
+        string error_code optional
+    }
+    User "1" --> "many" SyncReceipt : user_id
+    User "1" --> "many" SyncCursor : user_id

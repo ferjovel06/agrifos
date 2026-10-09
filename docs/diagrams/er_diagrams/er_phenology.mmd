@@ -5,6 +5,7 @@ erDiagram
     PARCEL ||--o{ PARCEL_PHENOLOGICAL_STAGE : parcel_id
     PHENOLOGICAL_STAGE_TEMPLATE ||--o{ PARCEL_PHENOLOGICAL_STAGE : template_id
     PARCEL {
+        int revision
         uuid farm_id FK
         uuid crop_id FK
         uuid variety_id FK "nullable"
