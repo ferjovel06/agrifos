@@ -4,6 +4,35 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  testWidgets(
+    'historical offline data shows age and no current labor recommendation on a narrow screen',
+    (tester) async {
+      await tester.binding.setSurfaceSize(const Size(360, 800));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      final base = _forecast();
+      final forecast = WeatherForecast(
+        farmId: base.farmId,
+        provider: base.provider,
+        current: base.current,
+        daily: base.daily,
+        updatedAt: DateTime(2026, 8, 27, 10),
+        freshness: 'historical',
+        offline: true,
+      );
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: WeatherConditionsCard(forecast: forecast, isLoading: true),
+          ),
+        ),
+      );
+      expect(find.text('REFERENCIA HISTÓRICA'), findsOneWidget);
+      expect(find.text('Pronóstico histórico'), findsOneWidget);
+      expect(find.textContaining('Actualizado:'), findsOneWidget);
+      expect(find.text('Condiciones favorables para labores'), findsNothing);
+      expect(tester.takeException(), isNull);
+    },
+  );
   testWidgets('shows current conditions and available weather values', (
     tester,
   ) async {

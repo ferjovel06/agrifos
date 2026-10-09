@@ -3,6 +3,17 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:flutter/foundation.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:uuid/uuid.dart';
+import 'core/network_health.dart';
+import 'data/api/api_client.dart';
+import 'data/local/offline_database.dart';
+import 'data/local/secure_vault.dart';
+import 'data/sync/offline_runtime.dart';
+import 'data/sync/sync_engine.dart';
+import 'presentation/navigation/offline_coordinator.dart';
 
 import 'core/env.dart';
 import 'core/supabase_http_client.dart';
@@ -18,13 +29,59 @@ import 'presentation/sensor/sensor_provider.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await dotenv.load(fileName: '.env');
+  final vault = SecureVault('agrifos:${Uri.parse(Env.supabaseUrl).host}');
 
   await Supabase.initialize(
     url: Env.supabaseUrl,
     publishableKey: Env.supabasePublishableKey,
     httpClient: SupabaseHttpClient(),
+    authOptions: FlutterAuthClientOptions(
+      localStorage: SecureSessionStorage(
+        vault,
+        'sb-${Uri.parse(Env.supabaseUrl).host.split('.').first}-auth-token',
+      ),
+      pkceAsyncStorage: SecurePkceStorage(vault),
+    ),
   );
-
+  if (!kIsWeb) {
+    final support = await getApplicationSupportDirectory();
+    final namespace = const Uuid().v5(
+      Namespace.url.value,
+      '${Env.apiBaseUrl}:${Env.supabaseUrl}',
+    );
+    final db = OfflineDatabase.file(
+      '${support.path}/offline-$namespace.sqlite',
+      accountKey: vault.key,
+    );
+    final network = NetworkHealth.shared;
+    network.hint(
+      !(await Connectivity().checkConnectivity()).contains(
+        ConnectivityResult.none,
+      ),
+    );
+    final client = ApiClient();
+    final engine = SyncEngine(
+      database: db,
+      client: client,
+      network: network,
+      identity: () => Supabase.instance.client.auth.currentUser?.id,
+      refreshSession: () async {
+        try {
+          await Supabase.instance.client.auth.refreshSession();
+          return true;
+        } catch (_) {
+          return false;
+        }
+      },
+    );
+    OfflineRuntime.shared = OfflineRuntime(
+      database: db,
+      client: client,
+      vault: vault,
+      engine: engine,
+      network: network,
+    );
+  }
   runApp(const AgrifosApp());
 }
 
@@ -85,7 +142,9 @@ class AgrifosApp extends StatelessWidget {
             errorStyle: const TextStyle(fontSize: 12),
           ),
         ),
-        home: const AuthGate(),
+        home: OfflineRuntime.shared == null
+            ? const AuthGate()
+            : const OfflineCoordinator(child: AuthGate()),
       ),
     );
   }

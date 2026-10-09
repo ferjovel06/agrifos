@@ -34,7 +34,7 @@ class _AuthGateState extends State<AuthGate> {
 
     final auth = context.watch<AuthProvider>();
     return switch (auth.status) {
-      AuthStatus.authenticated => const MainShell(),
+      AuthStatus.authenticated => MainShell(key: ValueKey(auth.user?.id)),
       AuthStatus.emailConfirmationPending =>
         const EmailConfirmationPendingScreen(),
       AuthStatus.passwordRecovery => const PasswordRecoveryScreen(),

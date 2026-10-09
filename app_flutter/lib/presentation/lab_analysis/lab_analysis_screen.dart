@@ -291,6 +291,14 @@ class _AnalysisTile extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    if (analysis.syncStatus != 'synced')
+                      const Text(
+                        'Pendiente de sincronizar',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Color(0xFF31543B),
+                        ),
+                      ),
                     Text(
                       analysis.sampleCode ?? 'Sin código',
                       style: const TextStyle(
