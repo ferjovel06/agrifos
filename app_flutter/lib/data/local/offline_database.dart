@@ -36,7 +36,7 @@ class OfflineDatabase extends GeneratedDatabase {
   }
 
   @override
-  int get schemaVersion => 1;
+  int get schemaVersion => 2;
   @override
   Iterable<TableInfo<Table, dynamic>> get allTables => const [];
   @override
@@ -49,7 +49,36 @@ class OfflineDatabase extends GeneratedDatabase {
       }
     },
     onUpgrade: (_, from, to) async {
-      throw StateError('Unsupported offline migration $from → $to');
+      if (from != 1 || to != 2) {
+        throw StateError('Unsupported offline migration $from → $to');
+      }
+      await transaction(() async {
+        await customStatement(
+          'ALTER TABLE entities ADD COLUMN processing_pending INTEGER NOT NULL DEFAULT 0',
+        );
+        await customStatement(
+          'ALTER TABLE entities ADD COLUMN processing_group TEXT',
+        );
+        await _processingIndexes();
+        // One-time migration of inferred metadata; ciphertext and AAD stay intact.
+        for (final row in await rows(
+          "SELECT * FROM entities WHERE kind='readings'",
+          [],
+        )) {
+          final account = row['account'] as String;
+          final data = await _decodeEntity(account, 'readings', row);
+          final metadata = await _processingMetadata(
+            account,
+            'readings',
+            data,
+            row['dirty'] == 1,
+          );
+          await customStatement(
+            'UPDATE entities SET processing_pending=?,processing_group=? WHERE account=? AND kind=? AND id=?',
+            [metadata.$1, metadata.$2, account, 'readings', row['id']],
+          );
+        }
+      });
     },
     beforeOpen: (_) async {
       await customStatement('PRAGMA journal_mode = WAL');
@@ -62,8 +91,11 @@ class OfflineDatabase extends GeneratedDatabase {
       account TEXT NOT NULL, kind TEXT NOT NULL, id TEXT NOT NULL,
       farm TEXT NOT NULL, parent TEXT, data TEXT NOT NULL,
       revision INTEGER, dirty INTEGER NOT NULL DEFAULT 0, remote TEXT,
+      processing_pending INTEGER NOT NULL DEFAULT 0, processing_group TEXT,
       PRIMARY KEY(account,kind,id))''',
     'CREATE INDEX entities_scope ON entities(account,kind,farm,parent)',
+    'CREATE INDEX entities_processing_pending ON entities(account,kind,processing_pending,id)',
+    'CREATE INDEX entities_processing_group ON entities(account,kind,processing_group,dirty,id)',
     '''CREATE TABLE outbox (
       account TEXT NOT NULL, operation_id TEXT NOT NULL, entity_id TEXT NOT NULL,
       entity TEXT NOT NULL, operation TEXT NOT NULL, payload_version INTEGER NOT NULL,
@@ -78,6 +110,60 @@ class OfflineDatabase extends GeneratedDatabase {
     '''CREATE TABLE checkpoints (
       account TEXT PRIMARY KEY, cursor TEXT, synced_at INTEGER)''',
   ];
+
+  Future<void> _processingIndexes() async {
+    await customStatement(_schema[2]);
+    await customStatement(_schema[3]);
+  }
+
+  Future<(int, String?)> _processingMetadata(
+    String account,
+    String kind,
+    Map<String, dynamic> data,
+    bool dirty,
+  ) async {
+    final measurement = data['measurement'];
+    if (kind != 'readings' || measurement is! Map) return (0, null);
+    final group = await _cacheKey(
+      account,
+      // Partition only by acquisition session within the account. The backend
+      // must see every parcel, device, decoder and point boundary in that route.
+      'sensor-group:v1:${jsonEncode(measurement['session_id'])}',
+    );
+    final results = data['derived_results'];
+    return (
+      !dirty && (results == null || results is List && results.isEmpty) ? 1 : 0,
+      group,
+    );
+  }
+
+  Future<List<Map<String, dynamic>>> pendingProcessing(String account) async {
+    final pending = await rows(
+      "SELECT * FROM entities WHERE account=? AND kind='readings' AND processing_pending=1 GROUP BY processing_group ORDER BY MIN(id) LIMIT 201",
+      [account],
+    );
+    return Future.wait(
+      pending.map(
+        (row) async => {
+          ...await _decodeEntity(account, 'readings', row),
+          '_processing_group': row['processing_group'],
+        },
+      ),
+    );
+  }
+
+  Future<List<Map<String, dynamic>>> processingGroup(
+    String account,
+    String group,
+  ) async {
+    final members = await rows(
+      "SELECT * FROM entities WHERE account=? AND kind='readings' AND processing_group=? AND dirty=0 ORDER BY id LIMIT 201",
+      [account, group],
+    );
+    return Future.wait(
+      members.map((row) => _decodeEntity(account, 'readings', row)),
+    );
+  }
 
   Future<List<Map<String, dynamic>>> rows(
     String sql,
@@ -166,11 +252,13 @@ class OfflineDatabase extends GeneratedDatabase {
   }) async {
     final id = data['id'] as String;
     final encrypted = await encrypt(account, '$kind:$id', data);
+    final processing = await _processingMetadata(account, kind, data, dirty);
     await customStatement(
-      '''INSERT INTO entities(account,kind,id,farm,parent,data,revision,dirty)
-      VALUES(?,?,?,?,?,?,?,?) ON CONFLICT(account,kind,id) DO UPDATE SET
+      '''INSERT INTO entities(account,kind,id,farm,parent,data,revision,dirty,processing_pending,processing_group)
+      VALUES(?,?,?,?,?,?,?,?,?,?) ON CONFLICT(account,kind,id) DO UPDATE SET
       farm=excluded.farm,parent=excluded.parent,data=excluded.data,
-      revision=excluded.revision,dirty=excluded.dirty,remote=NULL''',
+      revision=excluded.revision,dirty=excluded.dirty,remote=NULL,
+      processing_pending=excluded.processing_pending,processing_group=excluded.processing_group''',
       [
         account,
         kind,
@@ -180,6 +268,8 @@ class OfflineDatabase extends GeneratedDatabase {
         encrypted,
         data['revision'],
         dirty ? 1 : 0,
+        processing.$1,
+        processing.$2,
       ],
     );
   }
