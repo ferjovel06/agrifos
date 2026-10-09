@@ -1,5 +1,8 @@
 # PR #76: conflicto con main y validación de seguridad
 
+Informe histórico. La resolución posterior de main 8182f9f y las correcciones
+actuales se documentan en [docker-pr76-fixes.md](docker-pr76-fixes.md).
+
 Fecha: 2026-10-08, Guatemala. PR existente: [#76](https://github.com/ferjovel06/agrifos/pull/76).
 Rama: `chore/docker-environment`. **Draft; no se recomienda merge mientras el gate de seguridad siga en FAIL.**
 La aceptación humana de Android y el APK siguen pendientes; esta fase no los ejecuta.

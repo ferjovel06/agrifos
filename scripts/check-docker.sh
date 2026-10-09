@@ -128,7 +128,7 @@ check_images() {
   local previous_dir report_name
   mkdir -p "$evidence_dir/history"
   previous_dir="$(mktemp -d "$evidence_dir/history/scan.XXXXXXXX")"
-  for report_name in runtime-image-id.txt runtime-identity.json trivy-config.json trivy-runtime.json; do
+  for report_name in runtime-image-id.txt runtime-identity.json trivy-config.json trivy-runtime.json scan-status.json scanner-metadata.json gate-summary.json; do
     [[ ! -L "$evidence_dir/$report_name" ]] || fail 'Scanner evidence must not be a symlink.'
     if [[ -f "$evidence_dir/$report_name" ]]; then mv "$evidence_dir/$report_name" "$previous_dir/$report_name"; fi
   done
@@ -142,8 +142,19 @@ check_images() {
     --tmpfs /tmp:rw,noexec,nosuid,size=256m --env HOME=/tmp
     --mount "type=bind,source=$(native_path "$cache_dir"),target=/cache"
     --mount "type=bind,source=$(native_path "$evidence_dir"),target=/output")
-  docker run "${scanner_options[@]}" "$trivy_image" version
-  local config_status=0 image_status=0 identity_status=0
+  local config_status=-1 image_status=-1 identity_status=-1 database_status=-1 metadata_status=-1
+  write_scan_status() {
+    printf '{"config_exit":%d,"image_exit":%d,"identity_exit":%d,"database_exit":%d,"metadata_exit":%d,"platform":"%s","inspected_image_id":"%s"}\n' \
+      "$config_status" "$image_status" "$identity_status" "$database_status" "$metadata_status" \
+      "$runtime_platform" "$runtime_id" > "$evidence_dir/scan-status.json"
+  }
+  write_scan_status
+  # Use Trivy's normal DB freshness policy, including downloading an update when
+  # due. A failed refresh remains an operational failure even if a report exists.
+  database_status=0
+  docker run "${scanner_options[@]}" "$trivy_image" image --cache-dir /cache \
+    --timeout 10m --download-db-only || database_status=$?
+  config_status=0 image_status=0 identity_status=0 metadata_status=0
   # The scanner sees only the reviewed Dockerfiles/Compose file, never .env or
   # a Docker socket. Security findings and scanner failures both block this mode.
   docker run "${scanner_options[@]}" \
@@ -152,12 +163,12 @@ check_images() {
     --mount "type=bind,source=$(native_path "$repo_root/docker/loopback-adapter/Dockerfile"),target=/input/adapter/Dockerfile,readonly" \
     --mount "type=bind,source=$(native_path "$repo_root/compose.yaml"),target=/input/compose.yaml,readonly" \
     "$trivy_image" config --cache-dir /cache --timeout 10m --severity HIGH,CRITICAL \
-      --exit-code 1 --format json --output /output/trivy-config.json /input || config_status=$?
+      --exit-code 10 --format json --output /output/trivy-config.json /input || config_status=$?
   docker run "${scanner_options[@]}" \
     --mount "type=bind,source=$(native_path "$evidence_dir/runtime-image.tar"),target=/input/runtime-image.tar,readonly" \
     "$trivy_image" image --cache-dir /cache --timeout 10m --input /input/runtime-image.tar \
       --scanners vuln,secret --image-config-scanners misconfig,secret --severity HIGH,CRITICAL \
-      --exit-code 1 --format json --output /output/trivy-runtime.json || image_status=$?
+      --exit-code 10 --format json --output /output/trivy-runtime.json || image_status=$?
   if [[ -s "$evidence_dir/trivy-runtime.json" ]]; then
     docker run --rm --network none --user "$scanner_uid:$scanner_gid" --read-only \
       --cap-drop ALL --security-opt no-new-privileges:true \
@@ -169,13 +180,18 @@ check_images() {
     printf 'NOT RUN: runtime identity check; this scan produced no report.\n' >&2
     identity_status=1
   fi
+  docker run "${scanner_options[@]}" "$trivy_image" version --cache-dir /cache --format json \
+    > "$evidence_dir/scanner-metadata.json" || metadata_status=$?
+  write_scan_status
   # Remove only this task's exported archive; retain reports and the inspected ID.
   rm -f "$evidence_dir/runtime-image.tar"
-  if (( config_status != 0 || image_status != 0 || identity_status != 0 )); then
-    fail "Trivy configuration/image check failed or found HIGH/CRITICAL issues (config=$config_status, image=$image_status, identity=$identity_status). Review .docker/evidence/scanners reports and logs."
-  fi
-  [[ -s "$evidence_dir/trivy-config.json" && -s "$evidence_dir/trivy-runtime.json" ]] || fail 'Trivy did not produce both reports.'
-  printf 'PASS: Trivy 0.75.0 scanned actual backend runtime %s and configuration; no HIGH/CRITICAL findings.\n' "$runtime_id"
+  # The same report classifier produces CI's public summary. Missing/corrupt
+  # evidence, identity mismatches and scanner errors cannot become a clean scan.
+  docker run --rm --network none --user "$scanner_uid:$scanner_gid" --read-only \
+    --cap-drop ALL --security-opt no-new-privileges:true \
+    --mount "type=bind,source=$(native_path "$evidence_dir"),target=/evidence" \
+    --mount "type=bind,source=$(native_path "$repo_root/docker/scan_summary.py"),target=/summary.py,readonly" \
+    "$identity_image" python /summary.py /evidence /evidence/gate-summary.json --enforce
 }
 
 case "$mode" in

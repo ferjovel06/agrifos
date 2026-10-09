@@ -4,9 +4,10 @@ Esta infraestructura prepara el backend, Supabase Auth local y herramientas Flut
 **La validación todavía es parcial y no hay aprobación para integrar en main.**
 El adaptador resuelve la publicación loopback en Docker Desktop 4.55.0. El driver real
 de Auth/MFA/persistencia y Alembic pasa, y la base Trixie conserva Python y el lockfile.
-Trivy sigue en FAIL por ocho CVEs Debian (44 HIGH); Android permanece pendiente y
+Trivy sigue en FAIL por ocho CVEs Debian (40 HIGH tras retirar `mount`); Android permanece pendiente y
 el CI Docker global falla por ese gate, aunque las pruebas Linux funcionales pasan.
-Consulta [la resolución del conflicto y su validación](docker-pr76-merge.md),
+Consulta [las correcciones actuales del PR #76](docker-pr76-fixes.md),
+[la resolución anterior del conflicto](docker-pr76-merge.md),
 [la entrega Docker inicial](docker-closeout.md),
 [los riesgos pendientes](docker-security-risk-register.md) y
 [la validación inicial](docker-validation.md). Conserva el preflight habilitado.
@@ -340,8 +341,12 @@ El escáner conserva los informes anteriores en `history/` y verifica el digest 
 del archivo exportado contra el informe actual. Ejecuta los escaneos secuencialmente:
 comparten `.tools/trivy-cache` y Trivy bloquea su caché durante un análisis.
 CI conserva durante 30 días el artifact backend-scanner-summary, incluso cuando el gate
-falla. Solo contiene CVEs, paquetes/versiones, contadores y digest; omite matches de
-secretos, configuración Env y mensajes crudos. No cambia la condición de fallo.
+falla o un JSON está truncado. Contiene CVEs, paquetes/versiones, contadores, identidad,
+plataforma, distribución, versión/base de Trivy y códigos de salida por fase; omite matches
+de secretos, configuración Env y mensajes crudos. Distingue `FAIL_FINDINGS` de
+`FAIL_OPERATIONAL`; un informe ausente o corrupto nunca equivale a cero hallazgos.
+Trivy usa código 10 para hallazgos y 1 para errores operativos. El gate conserva salida
+no cero en ambos casos y actualiza la base mediante el mecanismo normal de Trivy.
 
 Trixie ya es la base normal adoptada tras la comparación documentada. El helper
 `bash scripts/evaluate-trixie.sh` y sus modos `test`, `scan`, `integration` conservan
@@ -349,6 +354,17 @@ tags aislados `agrifos-backend-evaluation:trixie-*`; ahora reproducen el mismo p
 Trixie sin modificar tags normales ni paquetes del lock. Rechazan bases no revisadas.
 El driver predeterminado usa la base actual del Dockerfile y devuelve error ante drift;
 el escaneo devuelve FAIL mientras persistan HIGH/CRITICAL.
+
+Para comprobar la API empaquetada, sin montar el código del host, usa el mismo driver:
+
+```bash
+AGRIFOS_INTEGRATION_VARIANT=runtime bash scripts/test-docker-integration.sh
+```
+
+Selecciona el servicio existente `api-runtime` y conserva Auth, MFA, migraciones,
+persistencia, auditoría de puertos y aislamiento del proyecto de prueba. Es la variante
+ejecutada por el check de integración de CI. El runtime retira mediante APT únicamente
+el paquete `mount`, innecesario para la API; conserva las bibliotecas y el inventario dpkg.
 
 El workflow Docker agrega validaciones sin sustituir los checks nativos existentes:
 backend con lock, pruebas/escaneo de imagen, integración Auth aislada y Flutter analyze/test.
