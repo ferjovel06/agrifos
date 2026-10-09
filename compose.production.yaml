@@ -1,6 +1,9 @@
 # Azure resource limits. Merge with the committed compose.yaml; never use alone.
 services:
   db:
+    image: agrifos-postgres:production
+    build:
+      context: ./deploy/postgres
     mem_limit: ${DB_MEMORY_LIMIT:-2g}
     cpus: ${DB_CPU_LIMIT:-1.0}
     pids_limit: 256
