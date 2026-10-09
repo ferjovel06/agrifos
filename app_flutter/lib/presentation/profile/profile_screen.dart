@@ -1041,9 +1041,9 @@ class _SettingsTabState extends State<_SettingsTab> {
       builder: (_) => const _ChangePasswordDialog(),
     );
     if (changed == true && mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Contraseña actualizada.')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Contraseña actualizada.')));
     }
   }
 
@@ -1061,7 +1061,10 @@ class _SettingsTabState extends State<_SettingsTab> {
             SizedBox(
               width: double.infinity,
               child: OutlinedButton.icon(
-                onPressed: auth.isUpdatingPassword ? null : _changePassword,
+                onPressed:
+                    !auth.supportsAccountManagement || auth.isUpdatingPassword
+                    ? null
+                    : _changePassword,
                 icon: const Icon(Icons.password_rounded),
                 label: const Text('Cambiar contraseña'),
               ),
@@ -1112,7 +1115,10 @@ class _SettingsTabState extends State<_SettingsTab> {
             SizedBox(
               width: double.infinity,
               child: OutlinedButton.icon(
-                onPressed: enabled == null || auth.isUpdatingMfa
+                onPressed:
+                    !auth.supportsAccountManagement ||
+                        enabled == null ||
+                        auth.isUpdatingMfa
                     ? null
                     : enabled
                     ? _disableMfa
@@ -1182,8 +1188,9 @@ class _ChangePasswordDialogState extends State<_ChangePasswordDialog> {
   }
 
   String? _validatePassword(String? value) {
-    if (value == null || value.length < 8) {
-      return 'Usa al menos 8 caracteres.';
+    final minimum = context.read<AuthProvider>().passwordMinLength;
+    if (value == null || value.length < minimum) {
+      return 'Usa al menos $minimum caracteres.';
     }
     if (!RegExp(r'[A-Z]').hasMatch(value) ||
         !RegExp(r'[a-z]').hasMatch(value) ||
@@ -1226,9 +1233,8 @@ class _ChangePasswordDialogState extends State<_ChangePasswordDialog> {
                   labelText: 'Nueva contraseña',
                   prefixIcon: const Icon(Icons.lock_outline),
                   suffixIcon: IconButton(
-                    onPressed: () => setState(
-                      () => _obscurePassword = !_obscurePassword,
-                    ),
+                    onPressed: () =>
+                        setState(() => _obscurePassword = !_obscurePassword),
                     icon: Icon(
                       _obscurePassword
                           ? Icons.visibility_outlined

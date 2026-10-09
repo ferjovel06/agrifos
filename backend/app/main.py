@@ -11,6 +11,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.db.session import get_db
 from app.core.config import settings
 from app.routers import (
+    auth,
+    auth_accounts,
     alerts,
     crops,
     diagnostic,
@@ -43,6 +45,8 @@ if settings.cors_origins:
         allow_headers=["*"],
     )
 
+app.include_router(auth.router)
+app.include_router(auth_accounts.router)
 app.include_router(alerts.router)
 app.include_router(users.router)
 app.include_router(readings.router)

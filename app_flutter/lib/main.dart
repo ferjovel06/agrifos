@@ -3,10 +3,14 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:app_links/app_links.dart';
 
 import 'core/env.dart';
 import 'core/supabase_http_client.dart';
+import 'data/api/api_client.dart';
 import 'data/api/auth_repository.dart';
+import 'data/api/native_auth_repository.dart';
+import 'data/api/supabase_auth_repository.dart';
 import 'presentation/auth/auth_provider.dart';
 import 'presentation/auth/auth_gate.dart';
 import 'presentation/farm/farm_provider.dart';
@@ -19,23 +23,39 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await dotenv.load(fileName: '.env');
 
-  await Supabase.initialize(
-    url: Env.supabaseUrl,
-    publishableKey: Env.supabasePublishableKey,
-    httpClient: SupabaseHttpClient(),
-  );
+  if (Env.authProvider == 'supabase') {
+    await Supabase.initialize(
+      url: Env.supabaseUrl,
+      publishableKey: Env.supabasePublishableKey,
+      httpClient: SupabaseHttpClient(),
+    );
+  }
 
-  runApp(const AgrifosApp());
+  runApp(
+    AgrifosApp(
+      authLinks: Env.authProvider == 'native' ? AppLinks().uriLinkStream : null,
+    ),
+  );
 }
 
 class AgrifosApp extends StatelessWidget {
-  const AgrifosApp({super.key});
+  const AgrifosApp({super.key, this.authLinks});
+  final Stream<Uri>? authLinks;
 
   @override
   Widget build(BuildContext context) {
     return MultiProvider(
       providers: [
-        ChangeNotifierProvider(create: (_) => AuthProvider(AuthRepository())),
+        ChangeNotifierProvider(
+          lazy: false,
+          create: (_) {
+            final AuthRepository repository = Env.authProvider == 'native'
+                ? NativeAuthRepository(authLinks: authLinks)
+                : SupabaseAuthRepository();
+            ApiClient.defaultTokenProvider = () => repository.accessToken;
+            return AuthProvider(repository);
+          },
+        ),
         ChangeNotifierProvider(create: (_) => SensorProvider()),
         ChangeNotifierProvider(create: (_) => LatestReadingProvider()),
         ChangeNotifierProvider(create: (_) => WeatherProvider()),

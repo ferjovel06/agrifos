@@ -177,8 +177,9 @@ class _PasswordRecoveryScreenState extends State<PasswordRecoveryScreen> {
   }
 
   String? _validatePassword(String? value) {
-    if (value == null || value.length < 8) {
-      return 'Usa al menos 8 caracteres.';
+    final minimum = context.read<AuthProvider>().passwordMinLength;
+    if (value == null || value.length < minimum) {
+      return 'Usa al menos $minimum caracteres.';
     }
     if (!RegExp(r'[A-Z]').hasMatch(value) ||
         !RegExp(r'[a-z]').hasMatch(value) ||
