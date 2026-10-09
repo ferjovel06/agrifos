@@ -1,0 +1,42 @@
+name: Container validation
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  containers:
+    runs-on: ubuntu-latest
+    env:
+      POSTGRES_PASSWORD: validation-only
+      DATABASE_URL: postgresql+asyncpg://postgres:validation-only@db:5432/agrifos
+      API_ENV_FILE: deploy/backend.env
+    steps:
+      - uses: actions/checkout@v6
+      - name: Prepare isolated validation environment
+        run: |
+          cp deploy/backend.env.example deploy/backend.env
+          docker compose -f compose.yaml -f compose.production.yaml config --quiet
+      - name: Run backend tests without network
+        run: |
+          docker build --target test -t agrifos-backend:test backend
+          docker run --rm --network none agrifos-backend:test
+      - name: Validate merged services and isolation
+        run: |
+          docker compose -f compose.yaml -f compose.production.yaml up -d --build --wait --wait-timeout 120
+          docker compose -f compose.yaml -f compose.production.yaml exec -T proxy nginx -t
+          docker compose -f compose.yaml -f compose.production.yaml exec -T api python -c "import os; assert os.getuid() == 10001; from app.core.config import settings; assert settings.ENV == 'production' and not settings.APP_DEBUG"
+          curl --fail --max-time 10 http://127.0.0.1:8080/health
+          curl --fail --max-time 10 http://127.0.0.1:8080/health/db
+      - name: Scan deployment images
+        run: |
+          for image in agrifos-backend:production agrifos-nginx:production postgres:17-alpine; do
+            docker save "$image" -o /tmp/agrifos-image.tar
+            docker run --rm -v /tmp/agrifos-image.tar:/image.tar:ro aquasec/trivy:latest image --input /image.tar --exit-code 1 --severity HIGH,CRITICAL --scanners vuln
+          done
+      - name: Stop disposable CI environment
+        if: always()
+        run: docker compose -f compose.yaml -f compose.production.yaml down -v
