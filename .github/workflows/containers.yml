@@ -32,11 +32,32 @@ jobs:
           curl --fail --max-time 10 http://127.0.0.1:8080/health
           curl --fail --max-time 10 http://127.0.0.1:8080/health/db
       - name: Scan deployment images
+        id: scan
+        continue-on-error: true
         run: |
-          for image in agrifos-backend:production agrifos-nginx:production postgres:17-alpine; do
+          mkdir -p reports "$RUNNER_TEMP/trivy-cache"
+          status=0
+          for image in agrifos-backend:production agrifos-nginx:production agrifos-postgres:production; do
+            report="${image//[:\/]/-}"
             docker save "$image" -o /tmp/agrifos-image.tar
-            docker run --rm -v /tmp/agrifos-image.tar:/image.tar:ro aquasec/trivy:latest image --input /image.tar --exit-code 1 --severity HIGH,CRITICAL --scanners vuln
+            if ! docker run --rm -v /tmp/agrifos-image.tar:/image.tar:ro -v "$PWD/reports:/reports" -v "$RUNNER_TEMP/trivy-cache:/root/.cache/trivy" aquasec/trivy:latest image --input /image.tar --format json --output "/reports/$report.json" --exit-code 1 --severity HIGH,CRITICAL --scanners vuln; then
+              status=1
+            fi
           done
+          exit "$status"
+      - name: Preserve vulnerability reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: container-vulnerability-reports
+          path: reports/*.json
+          retention-days: 7
+          if-no-files-found: warn
+      - name: Enforce vulnerability gate
+        if: ${{ always() && steps.scan.outcome == 'failure' }}
+        run: |
+          echo 'Container scanning failed. Review the vulnerability reports artifact.' >&2
+          exit 1
       - name: Stop disposable CI environment
         if: always()
         run: docker compose -f compose.yaml -f compose.production.yaml down -v
