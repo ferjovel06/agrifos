@@ -507,7 +507,7 @@ Las referencias bibliográficas no equivalen a validación local de dosis. Los p
 
 `POST /fertilization/recommendations` acepta `include_organic: true`; `GET /fertilization/plans/latest` admite la misma capacidad como parámetro. El valor predeterminado es `false`, para conservar el comportamiento de consumidores anteriores. Flutter solicita esta capacidad.
 
-Orgánico muestra Bocashi, Biol y Compost de pulpa de café, cantidades de referencia y un balance de composición total. No constituye una receta aprobada: disponibilidad temporal desconocida, `can_apply: false`, sin calendario ejecutable. Los sólidos usan kg/ha (y equivalencia en t/ha); el biol usa L/ha, sin convertir litros a kg por una densidad supuesta. Véase [implementación orgánica](docs/IMPLEMENTACION_ORGANICA_LOCAL.md).
+Orgánico muestra Bocashi, Biol y Compost de pulpa de café, cantidades de referencia y un balance de composición total. No constituye una receta aprobada: disponibilidad temporal desconocida, `can_apply: false`, sin calendario ejecutable. Los sólidos usan kg/ha (y equivalencia en t/ha); el biol usa L/ha, sin convertir litros a kg por una densidad supuesta.
 
 ## Documentación mantenida
 

@@ -58,7 +58,7 @@ Se fija un volumen ilustrativo limitado de biol y se evalúan combinaciones de l
 
 El escenario orgánico se añade en la rama productiva (más de 24 meses), cuando se solicita; no se añade al retorno de vivero o café joven. Económico y Bajo cloruro no siempre aparecen juntos: CE elevada prioriza solo Bajo cloruro, y la alternativa potásica depende de que haya requerimiento de K₂O.
 
-Los estados `partial` y `reference_only` conservan `can_apply: false`; no generan calendario ejecutable. El contrato impide promoverlos como una aplicación mineral. No implica certificación orgánica. Perfiles, fuentes, ejemplo numérico y pruebas se detallan en [IMPLEMENTACION_ORGANICA_LOCAL.md](IMPLEMENTACION_ORGANICA_LOCAL.md).
+Los estados `partial` y `reference_only` conservan `can_apply: false`; no generan calendario ejecutable. El contrato impide promoverlos como una aplicación mineral. No implica certificación orgánica.
 
 ## Persistencia y compatibilidad
 
@@ -74,6 +74,6 @@ No existe una matriz de infiltración integrada ni un bloqueo automático del c�
 
 ## Validación y mantenimiento
 
-Backend: pruebas en `backend/tests/`, ejecutadas desde `backend` con `python -m unittest discover -s tests -v` y variables de entorno de prueba. Flutter: `flutter analyze` y `flutter test` desde `app_flutter`. La demo orgánica usa `backend/tools/generate_organic_demo.py` y `app_flutter/tool/organic_demo.dart`; datos ficticios no sustituyen ensayo de campo ni infraestructura real.
+Backend: pruebas en `backend/tests/`, ejecutadas desde `backend` con `python -m unittest discover -s tests -v` y variables de entorno de prueba. Flutter: `flutter analyze` y `flutter test` desde `app_flutter`. Los datos ficticios no sustituyen ensayo de campo ni infraestructura real.
 
 Los PDF agronómicos del repositorio son referencias de diseño. Rangos de otros nutrientes y formulaciones propuestas no pasan a ser funcionalidades por figurar en esos documentos. Cualquier ampliación debe añadir contratos, cálculo, fuentes verificables y validación antes de documentarse como integrada.

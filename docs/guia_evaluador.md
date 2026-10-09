@@ -150,4 +150,4 @@ Recorrido móvil sugerido:
 - Confirmar que Ca/Mg/S del laboratorio no se presentan como dosis complementarias calculadas. La base fusionada mantiene el balance productivo NPK.
 - Verificar con otra cuenta que no puede consultar o modificar fincas ajenas salvo permisos globales de lectura aplicables. Mantener los casos de auditor sin escritura.
 
-Los resultados de pruebas históricos del escenario orgánico están en [su documento de implementación](IMPLEMENTACION_ORGANICA_LOCAL.md). Una demo con fixtures no valida conexión a Supabase, captura de sensor físico ni eficacia agronómica.
+Una demo con fixtures no valida conexión a Supabase, captura de sensor físico ni eficacia agronómica.
