@@ -1,7 +1,8 @@
 import uuid
 from datetime import datetime
-from sqlalchemy import Float, String, DateTime, ForeignKey, UniqueConstraint, func
+from sqlalchemy import CheckConstraint, Float, String, DateTime, ForeignKey, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.dialects.postgresql import JSONB
 
 from app.db.base import Base
 from app.models.mixins import RevisionMixin, UUIDPKMixin
@@ -10,16 +11,24 @@ from app.models.mixins import RevisionMixin, UUIDPKMixin
 class Reading(Base, RevisionMixin, UUIDPKMixin):
     """NPK readings from sensors."""
     __tablename__ = "readings"
+    __table_args__ = (
+        CheckConstraint("measurement IS NOT NULL OR (nitrogen IS NOT NULL AND phosphorus IS NOT NULL AND potassium IS NOT NULL AND ec IS NOT NULL AND ph IS NOT NULL AND temperature IS NOT NULL AND humidity IS NOT NULL)", name="ck_readings_provenance_or_legacy_values"),
+        CheckConstraint("measurement IS NULL OR (jsonb_typeof(measurement)='object' AND COALESCE(measurement->'contract_version'='1'::jsonb,false))", name="ck_readings_measurement_version"),
+    )
 
     parcel_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("parcels.id"), nullable=False)
 
-    nitrogen: Mapped[float] = mapped_column(Float)
-    phosphorus: Mapped[float] = mapped_column(Float)
-    potassium: Mapped[float] = mapped_column(Float)
-    ec: Mapped[float] = mapped_column(Float)
-    ph: Mapped[float] = mapped_column(Float)
-    temperature: Mapped[float] = mapped_column(Float)
-    humidity: Mapped[float] = mapped_column(Float)
+    nitrogen: Mapped[float | None] = mapped_column(Float, nullable=True)
+    phosphorus: Mapped[float | None] = mapped_column(Float, nullable=True)
+    potassium: Mapped[float | None] = mapped_column(Float, nullable=True)
+    ec: Mapped[float | None] = mapped_column(Float, nullable=True)
+    ph: Mapped[float | None] = mapped_column(Float, nullable=True)
+    temperature: Mapped[float | None] = mapped_column(Float, nullable=True)
+    humidity: Mapped[float | None] = mapped_column(Float, nullable=True)
+    measurement: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    # Cache projection published through the existing reading change journal.
+    derived_results: Mapped[list] = mapped_column(JSONB, nullable=False, server_default="[]")
+    received_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, server_default=func.now())
 
     recorded_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()

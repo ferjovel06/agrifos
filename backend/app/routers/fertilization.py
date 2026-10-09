@@ -192,6 +192,11 @@ async def create_recommendation(
                     status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
                     detail="The sensor reading does not belong to the parcel.",
                 )
+            if getattr(reading, "measurement", None) is not None:
+                raise HTTPException(status_code=422, detail={
+                    "code": "sensor_agronomic_reference_unvalidated",
+                    "message": "Sensor estimates require a comparable laboratory reference before fertilizer dosing. Calibration alone does not establish nutrient availability.",
+                })
             source_data = {
                 "id": reading.id,
                 "nitrogen": reading.nitrogen,
