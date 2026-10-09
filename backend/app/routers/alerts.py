@@ -9,7 +9,8 @@ from app.core.auth import (
     require_write_access,
 )
 from app.db.session import get_db
-from app.integrations.weather_provider import (
+from app.dependencies.weather import get_weather_service
+from app.integrations.weather_contracts import (
     WeatherProviderRateLimited,
     WeatherProviderTimeout,
     WeatherProviderUnavailable,
@@ -25,8 +26,6 @@ from app.services.weather_service import InvalidWeatherDataError, WeatherService
 router = APIRouter(prefix="/alerts", tags=["alerts"])
 
 
-def get_weather_service() -> WeatherService:
-    return WeatherService()
 
 
 async def _get_owned_farm(
