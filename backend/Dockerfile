@@ -51,6 +51,9 @@ CMD ["uv", "run", "--no-sync", "python", "-m", "unittest", "discover", "-s", "te
 FROM base AS runtime
 
 ENV ENV=production
+# APT verifies the dependency graph; the API and migrations do not mount filesystems.
+# Keep dpkg's inventory intact and preserve essential packages and Python libraries.
+RUN apt-get purge --yes mount
 # The base interpreter's pip vendors are not needed by the isolated app venv.
 RUN /usr/local/bin/python -m pip uninstall --yes pip
 COPY --from=dependencies /opt/venv /opt/venv
