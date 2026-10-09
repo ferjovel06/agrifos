@@ -15,7 +15,7 @@ from app.core.tokens import verify_access_token
 from app.db.session import get_db
 from app.main import app
 from app.models import AuthCredential, AuthMfaChallenge, AuthMfaFactor
-from app.services.mfa import _matching_counter, password_fingerprint, start_login_challenge, verify_login_challenge
+from app.services.mfa import matching_counter, password_fingerprint, start_login_challenge, verify_login_challenge
 
 
 class MfaServiceTests(unittest.IsolatedAsyncioTestCase):
@@ -140,9 +140,9 @@ class MfaServiceTests(unittest.IsolatedAsyncioTestCase):
 
     def test_clock_skew_window_accepts_adjacent_steps_but_not_older_codes(self):
         for offset in (-30,0,30):
-            self.assertEqual(_matching_counter(self.factor,self.totp.at(self.now+timedelta(seconds=offset)),self.now),self.totp.timecode(self.now)+offset//30)
+            self.assertEqual(matching_counter(self.factor,self.totp.at(self.now+timedelta(seconds=offset)),self.now),self.totp.timecode(self.now)+offset//30)
         self.factor.last_verified_counter = self.totp.timecode(self.now)+1
-        self.assertIsNone(_matching_counter(self.factor,self.totp.at(self.now),self.now))
+        self.assertIsNone(matching_counter(self.factor,self.totp.at(self.now),self.now))
 
 
 class MfaRouteTests(unittest.TestCase):
