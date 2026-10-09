@@ -2,7 +2,7 @@ name: Offline integration
 
 on:
   pull_request:
-    branches: [main]
+    branches: [main, feat/offline-first-foundation]
   workflow_dispatch:
 
 permissions:
@@ -58,9 +58,18 @@ jobs:
         run: |
           mkdir -p ../tmp/offline
           uv run python -m unittest tests.test_offline_postgres 2>&1 | tee ../tmp/offline/ci-postgres.log
+      - name: Test immutable sensor evidence and calibration gates in PostgreSQL
+        working-directory: backend
+        shell: bash
+        run: uv run python -m unittest tests.test_sensor_postgres 2>&1 | tee ../tmp/offline/ci-sensor-postgres.log
       - name: Test real Flutter SQLite to FastAPI HTTP to PostgreSQL
         shell: bash
         run: uv run --project backend python scripts/offline_integration.py 2>&1 | tee tmp/offline/ci-integration.log
+      - name: Test raw sensor provenance and deferred processing after reconnect
+        shell: bash
+        run: |
+          mkdir -p tmp/sensor
+          uv run --project backend python scripts/offline_integration.py --sensor 2>&1 | tee tmp/sensor/ci-sensor-integration.log
       - name: Preserve sanitized results
         if: always()
         uses: actions/upload-artifact@v4
@@ -69,4 +78,6 @@ jobs:
           path: |
             tmp/offline/ci-*.log
             tmp/offline/real-integration.json
+            tmp/sensor/ci-*.log
+            tmp/sensor/real-integration.json
           if-no-files-found: warn
