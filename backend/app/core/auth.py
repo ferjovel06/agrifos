@@ -9,6 +9,7 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
+from app.core.tokens import verify_access_token
 from app.db.session import get_db
 from app.models import User
 from app.repositories import user as user_repo
@@ -28,10 +29,28 @@ _jwks_client = jwt.PyJWKClient(
 )
 
 
+def _mfa_lookup_sql() -> str:
+    if settings.AUTH_PROVIDER == "native":
+        return """
+            SELECT EXISTS (
+                SELECT 1 FROM public.auth_credentials
+                WHERE user_id = CAST(:user_id AS uuid) AND mfa_enabled
+            )
+        """
+    return """
+        SELECT EXISTS (
+            SELECT 1 FROM auth.mfa_factors
+            WHERE user_id = CAST(:user_id AS uuid) AND status = 'verified'
+        )
+    """
+
+
 async def get_verified_claims(
     credentials: HTTPAuthorizationCredentials = Depends(bearer_scheme),
 ) -> dict[str, Any]:
     try:
+        if settings.AUTH_PROVIDER == "native":
+            return verify_access_token(credentials.credentials)
         signing_key = await asyncio.to_thread(
             _jwks_client.get_signing_key_from_jwt,
             credentials.credentials,
@@ -82,16 +101,7 @@ async def get_current_user(
     # Preserve the current opt-in MFA behavior.
     if aal != "aal2":
         result = await db.execute(
-            text(
-                """
-                SELECT EXISTS (
-                    SELECT 1
-                    FROM auth.mfa_factors
-                    WHERE user_id = CAST(:user_id AS uuid)
-                      AND status = 'verified'
-                )
-                """
-            ),
+            text(_mfa_lookup_sql()),
             {"user_id": user_id},
         )
 
