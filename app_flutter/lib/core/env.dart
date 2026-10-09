@@ -1,6 +1,12 @@
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 class Env {
+  static String get authRedirectUrl => dotenv.get(
+    'AUTH_REDIRECT_URL',
+    fallback: 'dev.agrifos.agrifos://auth-callback/',
+  );
+  static int get authPasswordMinLength =>
+      int.parse(dotenv.get('AUTH_PASSWORD_MIN_LENGTH', fallback: '12'));
   static String get authProvider {
     const override = String.fromEnvironment('AUTH_PROVIDER');
     final value = override.isNotEmpty

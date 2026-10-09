@@ -329,7 +329,7 @@ class _LoginFormState extends State<_LoginForm> {
             },
           ),
           const SizedBox(height: 8),
-          if (auth.supportsAccountManagement)
+          if (auth.supportsSessionPersistence)
             Row(
               children: [
                 Checkbox(
@@ -476,8 +476,10 @@ class _RegisterFormState extends State<_RegisterForm> {
                           ),
                         ),
                       ),
-                      validator: (value) => (value == null || value.length < 8)
-                          ? 'Mínimo 8 caracteres.'
+                      validator: (value) =>
+                          (value == null ||
+                              value.length < auth.passwordMinLength)
+                          ? 'Mínimo ${auth.passwordMinLength} caracteres.'
                           : null,
                     ),
                   ],

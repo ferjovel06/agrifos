@@ -6,7 +6,7 @@ class AuthException implements Exception {
   AuthException(this.message);
 }
 
-enum AuthEvent { changed, signedIn, passwordRecovery }
+enum AuthEvent { changed, signedIn, passwordRecovery, emailConfirmed, error }
 
 abstract class AuthRepository {
   AppUser? get currentUser;
@@ -15,6 +15,9 @@ abstract class AuthRepository {
   bool get requiresMfaVerification;
   bool get hasVerifiedMfaFactor;
   bool get supportsAccountManagement => false;
+  bool get supportsSessionPersistence => false;
+  int get passwordMinLength => 8;
+  String? get authErrorMessage => null;
 
   Future<void> signIn({required String email, required String password});
   Future<void> verifyMfa(String code);

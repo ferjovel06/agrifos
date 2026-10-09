@@ -33,6 +33,9 @@ class SupabaseAuthRepository extends AuthRepository {
   bool get supportsAccountManagement => true;
 
   @override
+  bool get supportsSessionPersistence => true;
+
+  @override
   Stream<AuthEvent> get authStateChanges => _client.auth.onAuthStateChange.map(
     (state) => switch (state.event) {
       AuthChangeEvent.passwordRecovery => AuthEvent.passwordRecovery,

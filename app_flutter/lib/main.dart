@@ -3,6 +3,7 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:app_links/app_links.dart';
 
 import 'core/env.dart';
 import 'core/supabase_http_client.dart';
@@ -30,11 +31,16 @@ Future<void> main() async {
     );
   }
 
-  runApp(const AgrifosApp());
+  runApp(
+    AgrifosApp(
+      authLinks: Env.authProvider == 'native' ? AppLinks().uriLinkStream : null,
+    ),
+  );
 }
 
 class AgrifosApp extends StatelessWidget {
-  const AgrifosApp({super.key});
+  const AgrifosApp({super.key, this.authLinks});
+  final Stream<Uri>? authLinks;
 
   @override
   Widget build(BuildContext context) {
@@ -44,7 +50,7 @@ class AgrifosApp extends StatelessWidget {
           lazy: false,
           create: (_) {
             final AuthRepository repository = Env.authProvider == 'native'
-                ? NativeAuthRepository()
+                ? NativeAuthRepository(authLinks: authLinks)
                 : SupabaseAuthRepository();
             ApiClient.defaultTokenProvider = () => repository.accessToken;
             return AuthProvider(repository);

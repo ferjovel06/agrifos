@@ -27,6 +27,8 @@ class AuthProvider extends ChangeNotifier {
   }
 
   bool get supportsAccountManagement => _repository.supportsAccountManagement;
+  bool get supportsSessionPersistence => _repository.supportsSessionPersistence;
+  int get passwordMinLength => _repository.passwordMinLength;
 
   AuthStatus status = AuthStatus.idle;
   AppUser? user;
@@ -44,6 +46,16 @@ class AuthProvider extends ChangeNotifier {
   bool _passwordRecoveryActive = false;
 
   void _handleAuthState(AuthEvent event) {
+    if (event == AuthEvent.error) {
+      errorMessage = _repository.authErrorMessage;
+      status = AuthStatus.error;
+      notifyListeners();
+      return;
+    }
+    if (event == AuthEvent.emailConfirmed) {
+      emailConfirmationRequired = false;
+      pendingConfirmationEmail = null;
+    }
     if (event == AuthEvent.passwordRecovery) {
       _passwordRecoveryActive = true;
     } else if (event == AuthEvent.signedIn) {
@@ -56,13 +68,13 @@ class AuthProvider extends ChangeNotifier {
 
   Future<void> _refreshAuthState() async {
     user = _repository.currentUser;
-    if (_repository.requiresMfaVerification) {
+    if (_passwordRecoveryActive) {
+      status = AuthStatus.passwordRecovery;
+    } else if (_repository.requiresMfaVerification) {
       status = AuthStatus.mfaRequired;
     } else if (user == null) {
       status = AuthStatus.idle;
       mfaEnabled = null;
-    } else if (_passwordRecoveryActive) {
-      status = AuthStatus.passwordRecovery;
     } else {
       if (_offerMfaEnrollment &&
           supportsAccountManagement &&
@@ -213,7 +225,9 @@ class AuthProvider extends ChangeNotifier {
     notifyListeners();
     try {
       await _repository.disableMfa();
+      _offerMfaEnrollment = false;
       mfaEnabled = false;
+      await _refreshAuthState();
       return true;
     } catch (e) {
       errorMessage = e is AuthException

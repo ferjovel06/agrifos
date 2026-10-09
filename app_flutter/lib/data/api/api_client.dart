@@ -70,7 +70,7 @@ class ApiClient {
     final response = await _send(
       _http.post(_uri(path), headers: headers, body: jsonEncode(body)),
     );
-    return _decode(response);
+    return _decode(response) ?? <String, dynamic>{};
   }
 
   Future<dynamic> get(String path, {Map<String, String>? query}) async {

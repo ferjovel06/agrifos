@@ -24,7 +24,7 @@
               android:name="io.flutter.embedding.android.NormalTheme"
               android:resource="@style/NormalTheme"
               />
-            <!-- Supabase's app_links listener owns authentication callbacks. -->
+            <!-- The selected authentication provider handles callbacks through app_links. -->
             <meta-data
                 android:name="flutter_deeplinking_enabled"
                 android:value="false" />
