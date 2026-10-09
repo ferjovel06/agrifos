@@ -48,6 +48,7 @@ void main() {
 
     expect(find.text('CONDICIONES ACTUALES'), findsOneWidget);
     expect(find.text('Datos: Open-Meteo'), findsOneWidget);
+    expect(find.text('CC BY 4.0'), findsOneWidget);
     expect(find.text('Condiciones favorables para labores'), findsOneWidget);
     expect(find.text('24°C'), findsOneWidget);
     expect(find.text('72% humedad'), findsOneWidget);

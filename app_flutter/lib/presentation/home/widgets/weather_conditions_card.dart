@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../../domain/entities/weather_forecast.dart';
 
@@ -90,9 +91,27 @@ class WeatherConditionsCard extends StatelessWidget {
                 letterSpacing: 1.2,
               ),
             ),
-            Text(
-              'Datos: ${data.provider}',
-              style: const TextStyle(color: Color(0xFFB9C7BC), fontSize: 8),
+            InkWell(
+              onTap: () => launchUrl(
+                Uri.parse(
+                  data.provider == 'MET Norway'
+                      ? 'https://api.met.no/'
+                      : 'https://open-meteo.com/',
+                ),
+              ),
+              child: Text(
+                'Datos: ${data.provider}',
+                style: const TextStyle(color: Color(0xFFB9C7BC), fontSize: 8),
+              ),
+            ),
+            InkWell(
+              onTap: () => launchUrl(
+                Uri.parse('https://creativecommons.org/licenses/by/4.0/'),
+              ),
+              child: const Text(
+                'CC BY 4.0',
+                style: TextStyle(color: Color(0xFFB9C7BC), fontSize: 8),
+              ),
             ),
           ],
         ),
