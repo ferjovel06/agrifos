@@ -60,12 +60,20 @@ class DailyWeather {
 }
 
 class WeatherForecast {
+  final DateTime? updatedAt;
+  final DateTime? generatedAt;
+  final String freshness;
+  final bool offline;
   final String farmId;
   final String provider;
   final CurrentWeather current;
   final List<DailyWeather> daily;
 
   const WeatherForecast({
+    this.updatedAt,
+    this.generatedAt,
+    this.freshness = 'fresh',
+    this.offline = false,
     required this.farmId,
     required this.provider,
     required this.current,
@@ -74,6 +82,14 @@ class WeatherForecast {
 
   factory WeatherForecast.fromJson(Map<String, dynamic> json) {
     return WeatherForecast(
+      updatedAt: DateTime.tryParse(
+        json['updated_at'] as String? ?? '',
+      )?.toLocal(),
+      generatedAt: DateTime.tryParse(
+        json['generated_at'] as String? ?? '',
+      )?.toLocal(),
+      freshness: json['freshness'] as String? ?? 'fresh',
+      offline: json['offline'] as bool? ?? false,
       farmId: json['farm_id'] as String,
       provider: json['provider'] as String,
       current: CurrentWeather.fromJson(json['current'] as Map<String, dynamic>),

@@ -1,5 +1,6 @@
 import '../../domain/entities/fertilization_recommendation.dart';
 import 'api_client.dart';
+import '../sync/offline_runtime.dart';
 
 class FertilizationRepository {
   FertilizationRepository({ApiClient? client})
@@ -8,10 +9,16 @@ class FertilizationRepository {
   final ApiClient _client;
 
   Future<FertilizationRecommendation?> getLatestPlan(String parcelId) async {
-    final response = await _client.get(
-      '/fertilization/plans/latest',
-      query: {'parcel_id': parcelId, 'include_organic': 'true'},
-    );
+    final runtime = OfflineRuntime.shared;
+    final response =
+        await (runtime?.cachedGet(
+              '/fertilization/plans/latest',
+              query: {'parcel_id': parcelId, 'include_organic': 'true'},
+            ) ??
+            _client.get(
+              '/fertilization/plans/latest',
+              query: {'parcel_id': parcelId, 'include_organic': 'true'},
+            ));
     if (response == null) return null;
     return FertilizationRecommendation.fromJson(
       response as Map<String, dynamic>,
@@ -33,7 +40,20 @@ class FertilizationRepository {
       'yield_unit': yieldUnit,
       'fruit_stage': fruitStage,
     }..removeWhere((_, value) => value == null);
+    final runtime = OfflineRuntime.shared;
+    final account = runtime?.requireAccount();
     final response = await _client.post('/fertilization/recommendations', body);
+    if (runtime != null) {
+      if (runtime.requireAccount() != account) {
+        throw ApiAuthException('La cuenta cambió.');
+      }
+      await runtime.database.putCache(
+        account!,
+        '/fertilization/plans/latest:{"parcel_id":"$parcelId","include_organic":"true"}',
+        response,
+        runtime.clock(),
+      );
+    }
     return FertilizationRecommendation.fromJson(response);
   }
 
@@ -71,7 +91,20 @@ class FertilizationRepository {
       'fruit_stage': fruitStage,
       'soil': soil,
     }..removeWhere((_, value) => value == null);
+    final runtime = OfflineRuntime.shared;
+    final account = runtime?.requireAccount();
     final response = await _client.post('/fertilization/recommendations', body);
+    if (runtime != null) {
+      if (runtime.requireAccount() != account) {
+        throw ApiAuthException('La cuenta cambió.');
+      }
+      await runtime.database.putCache(
+        account!,
+        '/fertilization/plans/latest:{"parcel_id":"$parcelId","include_organic":"true"}',
+        response,
+        runtime.clock(),
+      );
+    }
     return FertilizationRecommendation.fromJson(response);
   }
 }

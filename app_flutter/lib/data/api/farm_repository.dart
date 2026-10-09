@@ -1,5 +1,6 @@
 import '../../domain/entities/farm.dart';
 import 'api_client.dart';
+import '../sync/offline_runtime.dart';
 
 /// Talks to the Agrifos backend's `/farms` endpoints.
 class FarmRepository {
@@ -9,6 +10,10 @@ class FarmRepository {
 
   /// Fetches every farm owned by the current user.
   Future<List<Farm>> getFarms() async {
+    final runtime = OfflineRuntime.shared;
+    if (runtime != null) {
+      return (await runtime.read('farms')).map(Farm.fromJson).toList();
+    }
     final response = await _client.get('/farms');
     final list = (response as List).cast<Map<String, dynamic>>();
     return list.map(Farm.fromJson).toList();
@@ -21,12 +26,27 @@ class FarmRepository {
     required double latitude,
     required double longitude,
   }) async {
+    final runtime = OfflineRuntime.shared;
+    final account = runtime?.requireAccount();
     final response = await _client.post('/farms', {
       'name': name,
       'area_hectares': areaHectares,
       'latitude': latitude,
       'longitude': longitude,
     });
+    if (runtime != null) {
+      if (runtime.requireAccount() != account) {
+        throw ApiAuthException('La cuenta cambió.');
+      }
+      final user = account!;
+      await runtime.database.putEntity(
+        user,
+        'farms',
+        response,
+        response["id"] as String,
+      );
+      await runtime.engine.synchronize();
+    }
     return Farm.fromJson(response);
   }
 
@@ -37,12 +57,27 @@ class FarmRepository {
     required double latitude,
     required double longitude,
   }) async {
+    final runtime = OfflineRuntime.shared;
+    final account = runtime?.requireAccount();
     final response = await _client.patch('/farms/$id', {
       'name': name,
       'area_hectares': areaHectares,
       'latitude': latitude,
       'longitude': longitude,
     });
+    if (runtime != null) {
+      if (runtime.requireAccount() != account) {
+        throw ApiAuthException('La cuenta cambió.');
+      }
+      final user = account!;
+      await runtime.database.putEntity(
+        user,
+        'farms',
+        response,
+        response["id"] as String,
+      );
+      await runtime.engine.synchronize();
+    }
     return Farm.fromJson(response);
   }
 }
