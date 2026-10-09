@@ -22,3 +22,6 @@ dist
 **/*.pfx
 **/*.jks
 **/*.keystore
+.uv-*/
+.fastapicloud/
+tools/
