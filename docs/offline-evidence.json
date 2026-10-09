@@ -1,0 +1,286 @@
+{
+  "base": "8182f9f16c4fcb6f8f8a0c0fd58e31eef8d5ba0d",
+  "implementation_head": "9738fbe9c34c2636a5f91d95a6bfdfabe8d95925",
+  "backend": {
+    "status": "PASS",
+    "tests": 143,
+    "real_postgres_tests": 7
+  },
+  "flutter": {
+    "status": "PASS",
+    "tests": 116,
+    "skipped": [
+      "isolated HTTP integration in default suite; executed separately with PASS"
+    ]
+  },
+  "analysis": {
+    "status": "PASS",
+    "issues": 0
+  },
+  "real_integration": {
+    "status": "PASS",
+    "reading_records": 1,
+    "operation_receipts": 1,
+    "lab_records": 1,
+    "initial_queued_operations": 2,
+    "remote_lab_nitrogen": 77.0,
+    "lost_response_replayed": true,
+    "sqlite_reopened": true,
+    "real_http": true,
+    "real_postgresql": true,
+    "jwt_es256": true,
+    "conflict_review": true
+  },
+  "flutter_calls": {
+    "status": "PASS",
+    "scenario": "10 same-location repository openings within TTL",
+    "flutter_backend_calls_before": 10,
+    "flutter_backend_calls_after": 1,
+    "http": "synthetic"
+  },
+  "provider_calls_before": {
+    "status": "PASS",
+    "mode": "origin/main memory caches",
+    "scenario": "10 independent services, equivalent locations, failing primary, fresh fallback",
+    "backend_forecast_requests": 10,
+    "external_requests": {
+      "Open-Meteo": 10,
+      "MET Norway": 10
+    },
+    "http": "synthetic",
+    "postgresql": false
+  },
+  "provider_calls_after": {
+    "status": "PASS",
+    "mode": "PostgreSQL shared cache",
+    "scenario": "10 independent services, equivalent locations, failing primary, fresh fallback",
+    "backend_forecast_requests": 10,
+    "external_requests": {
+      "Open-Meteo": 1,
+      "MET Norway": 1
+    },
+    "http": "synthetic",
+    "postgresql": true
+  },
+  "dependencies": {
+    "existing_versions_changed": {},
+    "new_packages": {
+      "connectivity_plus": "7.3.1",
+      "connectivity_plus_platform_interface": "2.1.0",
+      "cryptography": "2.9.0",
+      "drift": "2.35.2",
+      "flutter_secure_storage": "11.2.0",
+      "flutter_secure_storage_darwin": "0.4.3",
+      "flutter_secure_storage_linux": "3.0.3",
+      "flutter_secure_storage_platform_interface": "2.1.1",
+      "flutter_secure_storage_web": "2.1.1",
+      "flutter_secure_storage_windows": "4.2.2",
+      "glob": "2.2.0",
+      "native_toolchain_c": "0.19.2",
+      "nm": "0.5.0",
+      "sqlite3": "3.5.2"
+    },
+    "existing_now_direct": [
+      "path_provider",
+      "uuid",
+      "url_launcher"
+    ],
+    "python_lock_changed": false
+  },
+  "failures": [
+    {
+      "check": "alembic check",
+      "status": "FAIL",
+      "inherited_on_base": true
+    },
+    {
+      "check": "flutter build web in tracked project",
+      "status": "FAIL",
+      "reason": "base has no tracked web scaffold; separate isolated web compilation passed"
+    }
+  ],
+  "not_run": [
+    "Android APK and actual device restart/OTG/keystore",
+    "live Supabase signin/refresh/TOTP",
+    "iOS/macOS/Windows/Linux native app launch",
+    "production traffic, battery and low-end performance",
+    "vulnerability scan (only secret scan performed)"
+  ],
+  "local_evidence": [
+    {
+      "file": "tmp/offline/backend-baseline.log",
+      "sha256": "e86842d50e6e5bd8c21280acbc34ca0f69207b6ef1b5fc6fa9c847a1a158decb",
+      "bytes": 22025
+    },
+    {
+      "file": "tmp/offline/backend-final-full2.log",
+      "sha256": "7f973ede6e61917b620c556d2efac1ae44ce41bbbea2ed4b0c1a862253f63b02",
+      "bytes": 1666
+    },
+    {
+      "file": "tmp/offline/flutter-baseline.log",
+      "sha256": "dac811b84e3f13cfed76e1b2be35e8d34d7d9084a5583d4582697bfe734596ba",
+      "bytes": 40212
+    },
+    {
+      "file": "tmp/offline/flutter-private-cache-full.log",
+      "sha256": "8176c3825cd823a82b5a6b1beb564b267fb46f5b7a5ff0c8507f9954616fcab3",
+      "bytes": 17702
+    },
+    {
+      "file": "tmp/offline/flutter-final-analysis.log",
+      "sha256": "065b5d5d316e8715de137967562820e04597cb193360a218d201e9d022b78d2a",
+      "bytes": 2483
+    },
+    {
+      "file": "tmp/offline/real-integration-multiple.log",
+      "sha256": "74045d7330edeeaf2e1225b1ea2baace2b0a7881c5cc1ee96fab9ce4b54ceaf2",
+      "bytes": 3304
+    },
+    {
+      "file": "tmp/offline/alembic-heads.log",
+      "sha256": "f5d6be96089d221ff46e70a0407ecb6e33c193b8baad2609d10ba8632c44f265",
+      "bytes": 21
+    },
+    {
+      "file": "tmp/offline/migrations-initial.log",
+      "sha256": "ab65e3a92fdfa8f7fe770e877ae0c23758d1ef45d0cfafafa036521cbdc0ca10",
+      "bytes": 2249
+    },
+    {
+      "file": "tmp/offline/alembic-check-current.log",
+      "sha256": "1a4f95c7962c9aa1a6880720e32c9020d26101d78b850c2c34def1a93259a215",
+      "bytes": 4865
+    },
+    {
+      "file": "tmp/offline/alembic-check-baseline.log",
+      "sha256": "3a0b21288203d656074f307a296d892da8fd0abeb1cdb9d82b8d4f36d082ffad",
+      "bytes": 4699
+    },
+    {
+      "file": "tmp/offline/alembic-baseline-upgrade.log",
+      "sha256": "f69bb3cdc224a13f59f95fca11250e75804b73b7b33ca9367510b321ccac017b",
+      "bytes": 2090
+    },
+    {
+      "file": "tmp/offline/flutter-weather-before-after.log",
+      "sha256": "72b654d2de4f27317ed66173674177219f731b6fe54535ee069c43ff7fee9f44",
+      "bytes": 351
+    },
+    {
+      "file": "tmp/offline/weather-before.log",
+      "sha256": "2979ed04ba0cbaea144af208642ace12d535bda4dd31724aaa15a226e17efd0b",
+      "bytes": 1175
+    },
+    {
+      "file": "tmp/offline/weather-after.log",
+      "sha256": "7c6b3d83bcb905770bedadcbcae4c276473f3058bd23bb86e24941c7c4e817dd",
+      "bytes": 369
+    },
+    {
+      "file": "tmp/offline/provider-live-smoke.log",
+      "sha256": "aaba5f032178b8778dd1796b912e47d387a482b1351cae8aef5683190974f51b",
+      "bytes": 420
+    },
+    {
+      "file": "tmp/offline/provider-live-smoke-validated.log",
+      "sha256": "ab5e7f8ae94febe720248b5a1df29bfbbb85bfa7c8cc506e2ec41d76fb93cbee",
+      "bytes": 205
+    },
+    {
+      "file": "tmp/offline/flutter-web-build.log",
+      "sha256": "a7f72f9dab8ad37e403b941b9d3681f6becb4d66ace573d3a24fd0984a0f55e3",
+      "bytes": 122
+    },
+    {
+      "file": "tmp/offline/flutter-web-isolated.log",
+      "sha256": "b24c2ded55f71c317cfea8890872ac01aeaaed299a96471b6563fffbc0ba6ee6",
+      "bytes": 3838
+    },
+    {
+      "file": "tmp/offline/secret-scan.log",
+      "sha256": "eef1023f1261d64fbfbb70052f9ebd75f4f9cfa2ed4b449abd396e48ebc16583",
+      "bytes": 270
+    },
+    {
+      "file": "tmp/offline/backend-final-delivery.log",
+      "sha256": "ff51d25033d9e0dddcc0ac648c9fbf27aebdb6d1bfb051a7a7c9eb54c04fca4b",
+      "bytes": 1666
+    },
+    {
+      "file": "tmp/offline/flutter-final-full.log",
+      "sha256": "1dde543fc511dd0ff02020e9947e4b4072c9a1962835775b4e5d4f86aada8db3",
+      "bytes": 17762
+    },
+    {
+      "file": "tmp/offline/flutter-web-final-corrected.log",
+      "sha256": "8fbb70269b415423b31ac906fb5b70eb4f440e35a1eff520ed3a97e0767c9679",
+      "bytes": 6044
+    },
+    {
+      "file": "tmp/offline/secret-scan-final.log",
+      "sha256": "129a3a5bccb830d4ea1a099eccb4647f44ea8d6a404911bc0013d95150c3f182",
+      "bytes": 267
+    },
+    {
+      "file": "tmp/offline/secret-scan-final.json",
+      "sha256": "cc2e0fd32b43d2671042bc44098965bad8468d1833b7628d6348b34e255fa776",
+      "bytes": 81005
+    },
+    {
+      "file": "tmp/offline/github-ci-37887839569.log",
+      "sha256": "5f35efdf887c513a03480c59ebfe71ae132497f5f8d646e935237c436362bc2e",
+      "bytes": 117658
+    },
+    {
+      "file": "tmp/offline/ci-37887839609/offline-acceptance-results/ci-postgres.log",
+      "sha256": "8f792f0301daf76c21a5b07770efdeb23a1d4805a02d90739bfa6638724d38c3",
+      "bytes": 2941
+    },
+    {
+      "file": "tmp/offline/ci-37887839609/offline-acceptance-results/ci-integration.log",
+      "sha256": "39486db3a6db95ccafd00df31c06dc3bf123637e264751eb4831d69e00d275ad",
+      "bytes": 3142
+    },
+    {
+      "file": "tmp/offline/ci-37887839609/offline-acceptance-results/real-integration.json",
+      "sha256": "f9e6b432cb0e4f119effbfb6f63b0e4cfff59e9f8cd0d16b8339a0733823f10f",
+      "bytes": 315
+    }
+  ],
+  "secret_scan": {
+    "status": "PASS",
+    "findings": 0,
+    "scanner": "Trivy 0.75.0 secret",
+    "snapshot": "9b86aa5be0eb99c1c9820853127a6c1d762b0251"
+  },
+  "web_isolated_build": {
+    "status": "PASS",
+    "source_head": "9b86aa5",
+    "native_runtime_acceptance": false
+  },
+  "pull_request": {
+    "number": 82,
+    "url": "https://github.com/ferjovel06/agrifos/pull/82",
+    "draft": true,
+    "base": "main"
+  },
+  "ci": {
+    "validated_head": "9b86aa5be0eb99c1c9820853127a6c1d762b0251",
+    "base_at_pr_creation": "08ade9e2b4b55213f6ca571c22d252a7741b8e29",
+    "original_ci": {
+      "status": "PASS",
+      "url": "https://github.com/ferjovel06/agrifos/actions/runs/37887839569",
+      "backend_passed": 136,
+      "backend_skipped": 7,
+      "flutter_passed": 116,
+      "flutter_skipped": 1
+    },
+    "real_integration_ci": {
+      "status": "PASS",
+      "url": "https://github.com/ferjovel06/agrifos/actions/runs/37887839609",
+      "postgres_tests_passed": 7,
+      "three_layer_test_passed": 1
+    }
+  }
+}

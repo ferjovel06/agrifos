@@ -1,5 +1,10 @@
 import 'package:flutter/material.dart';
+import 'dart:async';
 import 'package:provider/provider.dart';
+import '../../data/sync/offline_runtime.dart';
+import '../home/weather_provider.dart';
+import '../farm/farm_provider.dart';
+import 'sync_status_bar.dart';
 
 import '../auth/auth_provider.dart';
 import '../home/home_screen.dart';
@@ -24,6 +29,59 @@ class MainShell extends StatefulWidget {
 
 class _MainShellState extends State<MainShell> {
   int _currentIndex = 0;
+  Timer? _weatherTimer;
+  String? _weatherFarm;
+  @override
+  void initState() {
+    super.initState();
+    OfflineRuntime.shared?.network.addListener(_networkChanged);
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final farm = context.watch<FarmProvider>().selectedFarmId;
+    if (farm != _weatherFarm) {
+      _weatherFarm = farm;
+      _activateWeather();
+    }
+  }
+
+  void _networkChanged() {
+    if (OfflineRuntime.shared?.network.operational == true) _activateWeather();
+  }
+
+  void _activateWeather() {
+    _weatherTimer?.cancel();
+    if (OfflineRuntime.shared?.engine.foreground == false ||
+        (_currentIndex != 0 && _currentIndex != 2) ||
+        _weatherFarm == null) {
+      return;
+    }
+    final farm = _weatherFarm;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted &&
+          OfflineRuntime.shared?.engine.foreground != false &&
+          farm != null &&
+          farm == _weatherFarm &&
+          (_currentIndex == 0 || _currentIndex == 2)) {
+        unawaited(context.read<WeatherProvider>().fetchForecast(farm));
+      }
+    });
+    _weatherTimer = Timer(const Duration(minutes: 15), _activateWeather);
+  }
+
+  void _select(int index) {
+    setState(() => _currentIndex = index);
+    _activateWeather();
+  }
+
+  @override
+  void dispose() {
+    _weatherTimer?.cancel();
+    OfflineRuntime.shared?.network.removeListener(_networkChanged);
+    super.dispose();
+  }
 
   static const _items = [
     AppNavItem(
@@ -54,10 +112,10 @@ class _MainShellState extends State<MainShell> {
   ];
 
   // Kept in the same order as `_items` so index i maps to screen i.
-  static const _screens = [
+  List<Widget> get _screens => [
     HomeScreen(),
     SensorScreen(),
-    PlanificationScreen(),
+    PlanificationScreen(active: _currentIndex == 2),
     FinanceScreen(),
     ProfileScreen(),
   ];
@@ -104,9 +162,10 @@ class _MainShellState extends State<MainShell> {
                     : const Color(0xFF31543B),
                 userName: user?.name ?? user?.email,
                 onNotificationsTap: () {},
-                onProfileTap: () => setState(() => _currentIndex = 4),
+                onProfileTap: () => _select(4),
               ),
               const SizedBox(height: 10),
+              if (OfflineRuntime.shared != null) const SyncStatusBar(),
               Expanded(
                 child: IndexedStack(index: _currentIndex, children: _screens),
               ),
@@ -117,7 +176,7 @@ class _MainShellState extends State<MainShell> {
       bottomNavigationBar: AppBottomNav(
         currentIndex: _currentIndex,
         items: _items,
-        onTap: (index) => setState(() => _currentIndex = index),
+        onTap: _select,
       ),
     );
   }

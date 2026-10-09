@@ -298,7 +298,9 @@ class TelemetryCard extends StatelessWidget {
       final warnings = diagnosis!.actionableWarnings;
       return warnings.isEmpty ? diagnosis!.displayLabel : warnings.join(' · ');
     }
-    if (saveStatus == SaveStatus.saved) return 'Muestra guardada correctamente';
+    if (saveStatus == SaveStatus.saved) {
+      return 'Datos guardados en este dispositivo. Revisa el estado de sincronización.';
+    }
     if (errorMessage != null && errorMessage!.trim().isNotEmpty) {
       return errorMessage;
     }

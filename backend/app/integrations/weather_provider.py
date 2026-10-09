@@ -1,6 +1,7 @@
 """Weather adapters and provider failover; concrete wiring lives in dependencies."""
 
 import logging
+import math
 from typing import Any
 
 from app.integrations.weather_contracts import (
@@ -25,7 +26,12 @@ async def _fetch_normalized(
 ) -> dict[str, Any]:
     payload = await transport.get_json(url, params=params, headers=headers)
     try:
-        return normalizer.normalize(payload, latitude, longitude, days)
+        normalized = normalizer.normalize(payload, latitude, longitude, days)
+        if "_agrifos_cache" in payload:
+            normalized["_agrifos_cache"] = payload["_agrifos_cache"]
+        if "properties" in payload:
+            normalized["generated_at"] = payload["properties"].get("meta", {}).get("updated_at")
+        return normalized
     except (KeyError, TypeError, ValueError, IndexError, AttributeError) as error:
         raise WeatherProviderUnavailable(
             "The weather service returned invalid forecast data."
@@ -95,8 +101,8 @@ class MetNorwayProvider:
         self, latitude: float, longitude: float, days: int,
     ) -> dict[str, Any]:
         params = {
-            "lat": round(latitude, 4),
-            "lon": round(longitude, 4),
+            "lat": math.trunc(latitude * 10000) / 10000,
+            "lon": math.trunc(longitude * 10000) / 10000,
         }
         headers = {
             "User-Agent": self._user_agent,

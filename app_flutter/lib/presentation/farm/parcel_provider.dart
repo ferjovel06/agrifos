@@ -20,6 +20,7 @@ class ParcelProvider extends ChangeNotifier {
   String? selectedParcelId;
   String? errorMessage;
   int dataRevision = 0;
+  int _generation = 0;
 
   Parcel? get currentParcel {
     final selectedId = selectedParcelId;
@@ -32,6 +33,8 @@ class ParcelProvider extends ChangeNotifier {
 
   Future<void> loadForFarm(String? nextFarmId, {bool force = false}) async {
     if (nextFarmId == null) {
+      _generation++;
+      _selectionByFarm.clear();
       farmId = null;
       parcels = const [];
       selectedParcelId = null;
@@ -45,6 +48,7 @@ class ParcelProvider extends ChangeNotifier {
       return;
     }
 
+    final generation = ++_generation;
     farmId = nextFarmId;
     parcels = const [];
     selectedParcelId = null;
@@ -54,7 +58,7 @@ class ParcelProvider extends ChangeNotifier {
 
     try {
       final result = await _parcelRepository.getParcels(nextFarmId);
-      if (farmId != nextFarmId) return;
+      if (farmId != nextFarmId || generation != _generation) return;
       parcels = result;
       final previousSelection = _selectionByFarm[nextFarmId];
       selectedParcelId = result.any((parcel) => parcel.id == previousSelection)
@@ -67,12 +71,12 @@ class ParcelProvider extends ChangeNotifier {
       dataRevision++;
       notifyListeners();
     } on ApiException catch (error) {
-      if (farmId != nextFarmId) return;
+      if (farmId != nextFarmId || generation != _generation) return;
       status = ParcelStatus.error;
       errorMessage = error.message;
       notifyListeners();
     } catch (_) {
-      if (farmId != nextFarmId) return;
+      if (farmId != nextFarmId || generation != _generation) return;
       status = ParcelStatus.error;
       errorMessage = 'No se pudieron cargar las parcelas.';
       notifyListeners();

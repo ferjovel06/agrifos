@@ -6,6 +6,7 @@ import 'sensor_diagnostic.dart';
 /// backend stores: nitrogen/phosphorus/potassium in mg/kg, ec in dS/m,
 /// temperature in °C, humidity in %.
 class Reading {
+  final String syncStatus;
   final String id;
   final String parcelId;
   final double nitrogen;
@@ -19,6 +20,7 @@ class Reading {
   final SensorDiagnostic? diagnosis;
 
   const Reading({
+    this.syncStatus = 'synced',
     required this.id,
     required this.parcelId,
     required this.nitrogen,
@@ -34,6 +36,7 @@ class Reading {
 
   factory Reading.fromJson(Map<String, dynamic> json) {
     return Reading(
+      syncStatus: json['_sync_status'] as String? ?? 'synced',
       id: json['id'] as String,
       parcelId: json['parcel_id'] as String,
       nitrogen: (json['nitrogen'] as num).toDouble(),
@@ -54,6 +57,7 @@ class Reading {
 
   Reading copyWith({SensorDiagnostic? diagnosis}) {
     return Reading(
+      syncStatus: syncStatus,
       id: id,
       parcelId: parcelId,
       nitrogen: nitrogen,

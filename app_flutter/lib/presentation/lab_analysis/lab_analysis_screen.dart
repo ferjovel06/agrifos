@@ -291,6 +291,14 @@ class _AnalysisTile extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    if (analysis.syncStatus != 'synced')
+                      const Text(
+                        'Pendiente de sincronizar',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Color(0xFF31543B),
+                        ),
+                      ),
                     Text(
                       analysis.sampleCode ?? 'Sin código',
                       style: const TextStyle(
@@ -375,11 +383,13 @@ class LabAnalysisFormScreen extends StatefulWidget {
     required this.parcelId,
     required this.repository,
     this.analysis,
+    this.onUpdate,
   });
 
   final String parcelId;
   final LabAnalysisRepository repository;
   final LabAnalysis? analysis;
+  final Future<void> Function(String id, LabAnalysisInput input)? onUpdate;
 
   @override
   State<LabAnalysisFormScreen> createState() => _LabAnalysisFormScreenState();
@@ -521,7 +531,8 @@ class _LabAnalysisFormScreenState extends State<LabAnalysisFormScreen> {
       if (analysis == null) {
         await widget.repository.create(widget.parcelId, input);
       } else {
-        await widget.repository.update(analysis.id, input);
+        await (widget.onUpdate?.call(analysis.id, input) ??
+            widget.repository.update(analysis.id, input));
       }
       if (!mounted) return;
       Navigator.of(context).pop(true);

@@ -18,6 +18,7 @@ class FarmProvider extends ChangeNotifier {
   List<Farm> farms = [];
   String? _selectedFarmId;
   String? errorMessage;
+  int _generation = 0;
   int parcelRevision = 0;
 
   String? get selectedFarmId => _selectedFarmId;
@@ -59,10 +60,12 @@ class FarmProvider extends ChangeNotifier {
   /// Fetches the current user's farms.
   Future<void> loadFarms({bool force = false, String? userId}) async {
     if (userId == null) {
+      _generation++;
       farms = [];
       _selectedFarmId = null;
       _loadedUserId = null;
       _hasLoadedOnce = false;
+      errorMessage = null;
       status = FarmStatus.loading;
       notifyListeners();
       return;
@@ -71,6 +74,7 @@ class FarmProvider extends ChangeNotifier {
     final userChanged = _loadedUserId != null && _loadedUserId != userId;
     if (_hasLoadedOnce && !force && !userChanged) return;
 
+    final generation = ++_generation;
     status = FarmStatus.loading;
     errorMessage = null;
     if (userChanged) farms = [];
@@ -78,6 +82,7 @@ class FarmProvider extends ChangeNotifier {
 
     try {
       final result = await _farmRepository.getFarms();
+      if (generation != _generation) return;
       // Admins receive every farm from GET /farms. The mobile home screen is
       // user-specific, so only the authenticated user's farms should decide
       // whether its empty state is shown.
@@ -90,14 +95,19 @@ class FarmProvider extends ChangeNotifier {
       status = farms.isEmpty ? FarmStatus.noFarm : FarmStatus.hasFarm;
       notifyListeners();
     } on ApiAuthException catch (e) {
+      if (generation != _generation) return;
+      if (generation != _generation) return;
       status = FarmStatus.error;
       errorMessage = e.message;
       notifyListeners();
     } on ApiException catch (e) {
+      if (generation != _generation) return;
+      if (generation != _generation) return;
       status = FarmStatus.error;
       errorMessage = e.message;
       notifyListeners();
     } catch (e) {
+      if (generation != _generation) return;
       status = FarmStatus.error;
       errorMessage = 'No se pudieron cargar tus fincas: $e';
       notifyListeners();
@@ -112,6 +122,7 @@ class FarmProvider extends ChangeNotifier {
     required double latitude,
     required double longitude,
   }) async {
+    final user = _loadedUserId;
     errorMessage = null;
     notifyListeners();
 
@@ -122,6 +133,7 @@ class FarmProvider extends ChangeNotifier {
         latitude: latitude,
         longitude: longitude,
       );
+      if (_loadedUserId != user) return false;
       farms = [farm, ...farms];
       _selectedFarmId = farm.id;
       _hasLoadedOnce = true;
@@ -129,14 +141,19 @@ class FarmProvider extends ChangeNotifier {
       notifyListeners();
       return true;
     } on ApiAuthException catch (e) {
+      if (_loadedUserId != user) return false;
+      if (_loadedUserId != user) return false;
       errorMessage = e.message;
       notifyListeners();
       return false;
     } on ApiException catch (e) {
+      if (_loadedUserId != user) return false;
+      if (_loadedUserId != user) return false;
       errorMessage = e.message;
       notifyListeners();
       return false;
     } catch (e) {
+      if (_loadedUserId != user) return false;
       errorMessage = 'No se pudo registrar la finca: $e';
       notifyListeners();
       return false;

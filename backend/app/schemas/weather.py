@@ -2,6 +2,7 @@ import uuid
 from datetime import date, datetime
 
 from pydantic import BaseModel, Field
+from typing import Literal
 
 
 class CurrentWeatherRead(BaseModel):
@@ -26,6 +27,11 @@ class DailyWeatherRead(BaseModel):
 
 
 class WeatherForecastRead(BaseModel):
+    generated_at: datetime | None = None
+    consulted_at: datetime | None = None
+    updated_at: datetime | None = None
+    fresh_until: datetime | None = None
+    freshness: Literal["fresh", "stale", "historical"] = "fresh"
     farm_id: uuid.UUID
     farm_name: str
     provider: str

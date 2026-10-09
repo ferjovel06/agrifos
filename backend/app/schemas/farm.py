@@ -19,6 +19,7 @@ class FarmUpdate(BaseModel):
 
 
 class FarmRead(BaseModel):
+    revision: int = 1
     model_config = ConfigDict(from_attributes=True)
 
     id: uuid.UUID

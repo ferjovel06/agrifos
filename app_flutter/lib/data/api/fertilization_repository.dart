@@ -1,5 +1,6 @@
 import '../../domain/entities/fertilization_recommendation.dart';
 import 'api_client.dart';
+import '../sync/offline_runtime.dart';
 
 class FertilizationRepository {
   FertilizationRepository({ApiClient? client})
@@ -8,10 +9,16 @@ class FertilizationRepository {
   final ApiClient _client;
 
   Future<FertilizationRecommendation?> getLatestPlan(String parcelId) async {
-    final response = await _client.get(
-      '/fertilization/plans/latest',
-      query: {'parcel_id': parcelId, 'include_organic': 'true'},
-    );
+    final runtime = OfflineRuntime.shared;
+    final response =
+        await (runtime?.cachedGet(
+              '/fertilization/plans/latest',
+              query: {'parcel_id': parcelId, 'include_organic': 'true'},
+            ) ??
+            _client.get(
+              '/fertilization/plans/latest',
+              query: {'parcel_id': parcelId, 'include_organic': 'true'},
+            ));
     if (response == null) return null;
     return FertilizationRecommendation.fromJson(
       response as Map<String, dynamic>,
@@ -33,7 +40,32 @@ class FertilizationRepository {
       'yield_unit': yieldUnit,
       'fruit_stage': fruitStage,
     }..removeWhere((_, value) => value == null);
-    final response = await _client.post('/fertilization/recommendations', body);
+    final runtime = OfflineRuntime.shared;
+    if (runtime != null) {
+      if (!runtime.network.operational) {
+        throw ApiException(
+          0,
+          'Necesitas conexión para calcular un plan nuevo.',
+        );
+      }
+      final rows = await runtime.read('lab_analyses', parent: parcelId);
+      if (rows.any(
+        (row) => row['id'] == labAnalysisId && row['_sync_status'] != 'synced',
+      )) {
+        throw ApiException(
+          409,
+          'Sincroniza o revisa la muestra antes de calcular un plan.',
+        );
+      }
+    }
+    Future<dynamic> request() =>
+        _client.post('/fertilization/recommendations', body);
+    final response = runtime == null
+        ? await request()
+        : await runtime.storeOnlineCache(
+            '/fertilization/plans/latest:{"parcel_id":"$parcelId","include_organic":"true"}',
+            request,
+          );
     return FertilizationRecommendation.fromJson(response);
   }
 
@@ -71,7 +103,34 @@ class FertilizationRepository {
       'fruit_stage': fruitStage,
       'soil': soil,
     }..removeWhere((_, value) => value == null);
-    final response = await _client.post('/fertilization/recommendations', body);
+    final runtime = OfflineRuntime.shared;
+    if (runtime != null) {
+      if (!runtime.network.operational) {
+        throw ApiException(
+          0,
+          'Necesitas conexión para calcular un plan nuevo.',
+        );
+      }
+      if (readingId != null) {
+        final rows = await runtime.read('readings', parent: parcelId);
+        if (rows.any(
+          (row) => row['id'] == readingId && row['_sync_status'] != 'synced',
+        )) {
+          throw ApiException(
+            409,
+            'Sincroniza o revisa la lectura antes de calcular un plan.',
+          );
+        }
+      }
+    }
+    Future<dynamic> request() =>
+        _client.post('/fertilization/recommendations', body);
+    final response = runtime == null
+        ? await request()
+        : await runtime.storeOnlineCache(
+            '/fertilization/plans/latest:{"parcel_id":"$parcelId","include_organic":"true"}',
+            request,
+          );
     return FertilizationRecommendation.fromJson(response);
   }
 }

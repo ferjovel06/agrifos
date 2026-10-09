@@ -24,6 +24,7 @@ from app.routers import (
     users,
     varieties,
     weather,
+    offline,
 )
 
 logger = logging.getLogger(__name__)
@@ -56,6 +57,7 @@ app.include_router(diagnostic.router)
 app.include_router(fertilization.router)
 app.include_router(lab_analysis.router)
 app.include_router(weather.router)
+app.include_router(offline.router)
 
 
 @app.get("/", response_class=HTMLResponse, include_in_schema=False)

@@ -1,0 +1,72 @@
+name: Offline integration
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: offline-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  sqlite-http-postgres:
+    name: SQLite HTTP PostgreSQL acceptance
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: offline_ci_fixture
+          POSTGRES_DB: agrifos_offline_ci
+        ports:
+          - 127.0.0.1:5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d agrifos_offline_ci"
+          --health-interval 5s --health-timeout 5s --health-retries 20
+    env:
+      ENV: test
+      APP_DEBUG: 'false'
+      DATABASE_URL: postgresql+asyncpg://postgres:offline_ci_fixture@127.0.0.1:5432/agrifos_offline_ci
+      OFFLINE_TEST_DATABASE_URL: postgresql+asyncpg://postgres:offline_ci_fixture@127.0.0.1:5432/agrifos_offline_ci
+      SUPABASE_URL: http://127.0.0.1:59998
+    steps:
+      - uses: actions/checkout@v6
+      - uses: astral-sh/setup-uv@v9.0.0
+        with:
+          version: '0.12.2'
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.44.9'
+          channel: stable
+          cache: true
+      - name: Install locked runtimes and dependencies
+        shell: bash
+        run: |
+          uv python install 3.13
+          uv sync --project backend --locked
+          cp app_flutter/.env.example app_flutter/.env
+          cd app_flutter
+          flutter pub get --enforce-lockfile
+      - name: Test real PostgreSQL migrations, JWT and shared weather cache
+        working-directory: backend
+        shell: bash
+        run: |
+          mkdir -p ../tmp/offline
+          uv run python -m unittest tests.test_offline_postgres 2>&1 | tee ../tmp/offline/ci-postgres.log
+      - name: Test real Flutter SQLite to FastAPI HTTP to PostgreSQL
+        shell: bash
+        run: uv run --project backend python scripts/offline_integration.py 2>&1 | tee tmp/offline/ci-integration.log
+      - name: Preserve sanitized results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: offline-acceptance-results
+          path: |
+            tmp/offline/ci-*.log
+            tmp/offline/real-integration.json
+          if-no-files-found: warn

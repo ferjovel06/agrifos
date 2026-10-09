@@ -1,5 +1,6 @@
 class LabAnalysis {
   const LabAnalysis({
+    this.syncStatus = 'synced',
     required this.id,
     required this.parcelId,
     required this.sampleCode,
@@ -27,6 +28,7 @@ class LabAnalysis {
     required this.recordedAt,
   });
 
+  final String syncStatus;
   final String id;
   final String parcelId;
   final String? sampleCode;
@@ -54,6 +56,7 @@ class LabAnalysis {
   final DateTime recordedAt;
 
   factory LabAnalysis.fromJson(Map<String, dynamic> json) => LabAnalysis(
+    syncStatus: json['_sync_status'] as String? ?? 'synced',
     id: json['id'] as String,
     parcelId: json['parcel_id'] as String,
     sampleCode: json['sample_code'] as String?,

@@ -62,6 +62,7 @@ async def evaluate_farm_alerts(
     weather_service: WeatherService = Depends(get_weather_service),
 ):
     farm = await _get_owned_farm(farm_id, db, current_user)
+    await db.commit()
     try:
         forecast = await weather_service.forecast(farm, days)
     except WeatherProviderRateLimited as error:
@@ -80,6 +81,13 @@ async def evaluate_farm_alerts(
             detail="No se pudieron evaluar las alertas climáticas.",
         ) from error
 
+    if forecast.freshness == "historical":
+        raise HTTPException(503, "El pronóstico histórico no permite evaluar alertas actuales.")
+    # Ownership can change while waiting for a provider; authorize again before
+    # persisting the evaluation. Populate existing avoids an identity-map hit.
+    await db.refresh(farm)
+    if farm.user_id != current_user.id and not has_global_read_access(current_user):
+        raise HTTPException(403, "Not enough permissions.")
     candidates = evaluate_climate_alerts(farm, forecast)
     alerts = await alert_repo.sync_weather_alerts(db, farm.id, candidates)
     return AlertEvaluationRead(

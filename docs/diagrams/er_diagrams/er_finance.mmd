@@ -5,6 +5,7 @@ erDiagram
     FARM ||--o{ PRODUCTION : farm_id
     INCOME o|--o{ PRODUCTION : income_id
     FARM {
+        int revision
         uuid user_id FK
         string name
         float area_hectares

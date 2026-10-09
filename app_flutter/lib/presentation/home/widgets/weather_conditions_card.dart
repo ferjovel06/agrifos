@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../../domain/entities/weather_forecast.dart';
 
@@ -24,7 +25,9 @@ class WeatherConditionsCard extends StatelessWidget {
       borderRadius: BorderRadius.circular(_radius),
       child: SizedBox(
         width: double.infinity,
-        height: 190,
+        height:
+            (forecast?.updatedAt == null ? 190.0 : 240.0) *
+            MediaQuery.textScalerOf(context).scale(1),
         child: Stack(
           fit: StackFit.expand,
           children: [
@@ -53,12 +56,12 @@ class WeatherConditionsCard extends StatelessWidget {
   }
 
   Widget _buildContent() {
-    if (isLoading) {
+    if (isLoading && forecast == null) {
       return const Center(
         child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
       );
     }
-    if (errorMessage != null || forecast == null) {
+    if (forecast == null) {
       return _WeatherUnavailable(message: errorMessage, onRetry: onRetry);
     }
 
@@ -69,23 +72,46 @@ class WeatherConditionsCard extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
+        Wrap(
+          spacing: 7,
+          runSpacing: 4,
+          crossAxisAlignment: WrapCrossAlignment.center,
           children: [
             const Icon(Icons.circle, size: 7, color: Color(0xFF6FB782)),
-            const SizedBox(width: 7),
-            const Text(
-              'CONDICIONES ACTUALES',
-              style: TextStyle(
+            Text(
+              data.freshness == 'historical'
+                  ? 'REFERENCIA HISTÓRICA'
+                  : data.offline || data.freshness == 'stale'
+                  ? 'PRONÓSTICO GUARDADO'
+                  : 'CONDICIONES ACTUALES',
+              style: const TextStyle(
                 color: Color(0xFFD7D2CA),
                 fontSize: 10,
                 fontWeight: FontWeight.w700,
                 letterSpacing: 1.2,
               ),
             ),
-            const Spacer(),
-            Text(
-              'Datos: ${data.provider}',
-              style: const TextStyle(color: Color(0xFFB9C7BC), fontSize: 8),
+            InkWell(
+              onTap: () => launchUrl(
+                Uri.parse(
+                  data.provider == 'MET Norway'
+                      ? 'https://api.met.no/'
+                      : 'https://open-meteo.com/',
+                ),
+              ),
+              child: Text(
+                'Datos: ${data.provider}',
+                style: const TextStyle(color: Color(0xFFB9C7BC), fontSize: 8),
+              ),
+            ),
+            InkWell(
+              onTap: () => launchUrl(
+                Uri.parse('https://creativecommons.org/licenses/by/4.0/'),
+              ),
+              child: const Text(
+                'CC BY 4.0',
+                style: TextStyle(color: Color(0xFFB9C7BC), fontSize: 8),
+              ),
             ),
           ],
         ),
@@ -147,12 +173,17 @@ class WeatherConditionsCard extends StatelessWidget {
                           size: 19,
                         ),
                         const SizedBox(width: 5),
-                        Text(
-                          '${current.temperatureC.round()}°C',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 23,
-                            fontWeight: FontWeight.w800,
+                        Flexible(
+                          child: FittedBox(
+                            fit: BoxFit.scaleDown,
+                            child: Text(
+                              '${current.temperatureC.round()}°C',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 23,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
                           ),
                         ),
                       ],
@@ -178,6 +209,21 @@ class WeatherConditionsCard extends StatelessWidget {
             ),
           ],
         ),
+        if (data.updatedAt case final updated?)
+          Padding(
+            padding: const EdgeInsets.only(top: 4),
+            child: Text(
+              'Actualizado: ${updated.day}/${updated.month} ${updated.hour.toString().padLeft(2, '0')}:${updated.minute.toString().padLeft(2, '0')}${data.offline
+                  ? ' · Sin conexión. Información guardada.'
+                  : data.freshness == 'historical'
+                  ? ' · No representa condiciones actuales.'
+                  : data.freshness == 'stale'
+                  ? ' · Sin actualizar.'
+                  : ''}',
+              style: const TextStyle(color: Colors.white, fontSize: 9),
+              maxLines: 2,
+            ),
+          ),
       ],
     );
   }
@@ -262,6 +308,15 @@ class _WeatherPresentation {
   final Color accent;
 
   factory _WeatherPresentation.fromForecast(WeatherForecast forecast) {
+    if (forecast.freshness == 'historical') {
+      return const _WeatherPresentation(
+        title: 'Pronóstico histórico',
+        message:
+            'Estos datos guardados no describen las condiciones actuales. Actualiza antes de planificar labores.',
+        icon: Icons.history,
+        accent: Color(0xFFFFC857),
+      );
+    }
     final current = forecast.current;
     final rain = forecast.precipitationNext72Hours;
     final maximumTemperature = forecast.maximumTemperatureNext72Hours;

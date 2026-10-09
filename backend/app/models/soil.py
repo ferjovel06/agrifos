@@ -4,10 +4,10 @@ from sqlalchemy import Float, String, DateTime, ForeignKey, UniqueConstraint, fu
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
-from app.models.mixins import UUIDPKMixin
+from app.models.mixins import RevisionMixin, UUIDPKMixin
 
 
-class Reading(Base, UUIDPKMixin):
+class Reading(Base, RevisionMixin, UUIDPKMixin):
     """NPK readings from sensors."""
     __tablename__ = "readings"
 
@@ -31,7 +31,7 @@ class Reading(Base, UUIDPKMixin):
     )
 
 
-class LabAnalysis(Base, UUIDPKMixin):
+class LabAnalysis(Base, RevisionMixin, UUIDPKMixin):
     """Lab analysis of soil samples."""
     __tablename__ = "lab_analyses"
     __table_args__ = (

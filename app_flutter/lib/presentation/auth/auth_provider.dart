@@ -6,6 +6,7 @@ import 'package:supabase_flutter/supabase_flutter.dart' hide AuthException;
 import 'package:app_flutter/data/api/auth_repository.dart';
 import 'package:app_flutter/domain/entities/app_user.dart';
 import 'package:app_flutter/domain/entities/mfa_enrollment.dart';
+import '../../data/sync/offline_runtime.dart';
 
 enum AuthStatus {
   idle,
@@ -23,7 +24,13 @@ class AuthProvider extends ChangeNotifier {
   late final StreamSubscription<AuthState> _authSubscription;
 
   AuthProvider(this._repository) {
-    _authSubscription = _repository.authStateChanges.listen(_handleAuthState);
+    _authSubscription = _repository.authStateChanges.listen(
+      _handleAuthState,
+      onError: (_) {
+        // Network refresh failures do not discard a previously granted local window.
+        unawaited(_refreshAuthState());
+      },
+    );
     _refreshAuthState();
   }
 
@@ -41,6 +48,8 @@ class AuthProvider extends ChangeNotifier {
   String? pendingConfirmationEmail;
   bool _offerMfaEnrollment = false;
   bool _passwordRecoveryActive = false;
+  int _authGeneration = 0;
+  Timer? _offlineExpiry;
 
   void _handleAuthState(AuthState authState) {
     if (authState.event == AuthChangeEvent.passwordRecovery) {
@@ -54,6 +63,7 @@ class AuthProvider extends ChangeNotifier {
   }
 
   Future<void> _refreshAuthState() async {
+    final generation = ++_authGeneration;
     user = _repository.currentUser;
     if (user == null) {
       status = AuthStatus.idle;
@@ -66,11 +76,35 @@ class AuthProvider extends ChangeNotifier {
       } else if (_offerMfaEnrollment && !_repository.hasVerifiedMfaFactor) {
         status = AuthStatus.mfaEnrollmentOffered;
       } else {
-        status = AuthStatus.authenticated;
+        final runtime = OfflineRuntime.shared;
+        final id = user!.id;
+        final allowed = runtime == null || await runtime.authorize(id);
+        if (generation != _authGeneration || user?.id != id) return;
+        status = allowed ? AuthStatus.authenticated : AuthStatus.idle;
+        if (!allowed) {
+          errorMessage =
+              'Necesitas conexión para validar tu acceso. Los cambios pendientes siguen guardados.';
+        }
+        if (allowed && runtime != null) {
+          _offlineExpiry?.cancel();
+          _offlineExpiry = Timer(
+            runtime.verifiedUntil!.difference(runtime.clock()),
+            () {
+              unawaited(runtime.suspendLocal());
+              status = AuthStatus.idle;
+              errorMessage =
+                  'Venció el acceso sin conexión. Inicia sesión para continuar; tus cambios están guardados.';
+              notifyListeners();
+            },
+          );
+          unawaited(runtime.engine.synchronize());
+        }
       }
     }
     notifyListeners();
   }
+
+  Future<void> verifyLocalAccess() => _refreshAuthState();
 
   Future<bool> signUp({
     required String name,
@@ -336,15 +370,31 @@ class AuthProvider extends ChangeNotifier {
   }
 
   Future<void> signOut() async {
+    _authGeneration++;
+    _offlineExpiry?.cancel();
+    user = null;
+    status = AuthStatus.idle;
+    notifyListeners();
     _offerMfaEnrollment = false;
     _passwordRecoveryActive = false;
     emailConfirmationRequired = false;
     pendingConfirmationEmail = null;
-    await _repository.signOut();
+    await OfflineRuntime.shared?.leave(explicit: true);
+    try {
+      await _repository.signOut();
+    } catch (_) {
+      // GoTrue removes its local session before attempting remote revocation.
+      errorMessage =
+          'Sesión cerrada en este dispositivo. La revocación remota necesita conexión.';
+      user = null;
+      status = AuthStatus.idle;
+      notifyListeners();
+    }
   }
 
   @override
   void dispose() {
+    _offlineExpiry?.cancel();
     _authSubscription.cancel();
     super.dispose();
   }

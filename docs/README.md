@@ -1,10 +1,13 @@
 # Documentación de Ágrifos
 
-Revisión sincronizada con `main` (`f986ccb`, PR #74), 8 de octubre de 2026.
+Base `origin/main` (`8182f9f`); propuesta offline-first en rama independiente, octubre de 2026. No implica despliegue ni merge.
 
 | Documento | Uso |
 |---|---|
 | [README del proyecto](../README.md) | Presentación, configuración y ejecución |
+| [Offline-first](offline-first.md) | Alcance, sincronización, seguridad y uso |
+| [Refactorización offline](offline-refactor.md) | Auditoría, métricas y simplificaciones aplicadas |
+| [Validación offline](offline-validation.md) | Pruebas reales y pendientes |
 | [Estado implementado](ESTADO_IMPLEMENTADO.md) | Capacidades, límites y fuentes de verdad |
 | [Motor](agrifos_engine_documentation.md) | Contrato, cálculo, unidades y persistencia |
 | [Guía de evaluación](guia_evaluador.md) | Recorrido API y aplicación |

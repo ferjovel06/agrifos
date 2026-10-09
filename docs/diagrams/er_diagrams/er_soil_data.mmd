@@ -3,6 +3,7 @@ erDiagram
     PARCEL ||--o{ READING : parcel_id
     PARCEL ||--o{ LAB_ANALYSIS : parcel_id
     PARCEL {
+        int revision
         uuid farm_id FK
         uuid crop_id FK
         uuid variety_id FK "nullable"
@@ -15,6 +16,7 @@ erDiagram
         datetime updated_at
     }
     READING {
+        int revision
         uuid parcel_id FK
         float nitrogen
         float phosphorus
@@ -27,6 +29,7 @@ erDiagram
         uuid id PK
     }
     LAB_ANALYSIS {
+        int revision
         uuid parcel_id FK
         string sample_code "nullable"
         datetime sampled_at "nullable"

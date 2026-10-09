@@ -37,6 +37,7 @@ class ReadingCreate(BaseModel):
 
 
 class ReadingRead(BaseModel):
+    revision: int = 1
     model_config = ConfigDict(from_attributes=True)
 
     id: uuid.UUID

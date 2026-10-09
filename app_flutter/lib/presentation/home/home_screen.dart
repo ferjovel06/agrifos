@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../data/sync/offline_runtime.dart';
 import 'package:provider/provider.dart';
 
 import '../auth/auth_provider.dart';
@@ -77,7 +78,8 @@ class _HomeScreenState extends State<HomeScreen> {
     final readingProvider = context.read<LatestReadingProvider>();
     final weatherProvider = context.read<WeatherProvider>();
     final parcelProvider = context.read<ParcelProvider>();
-    final weatherFuture = weatherProvider.fetchForecast(farmId);
+    final weatherFuture = OfflineRuntime.shared == null
+        ? weatherProvider.fetchForecast(farmId) : Future<void>.value();
 
     try {
       await parcelProvider.loadForFarm(farmId, force: forceParcels);

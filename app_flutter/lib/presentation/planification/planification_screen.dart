@@ -7,6 +7,8 @@ import '../../domain/entities/climate_alert.dart';
 import '../../domain/entities/weather_forecast.dart';
 import '../auth/auth_provider.dart';
 import '../farm/farm_provider.dart';
+import '../home/weather_provider.dart';
+import '../../data/sync/offline_runtime.dart';
 
 const _green = Color(0xFF31543B);
 const _brown = Color(0xFF542E22);
@@ -34,7 +36,9 @@ class PlanificationScreen extends StatefulWidget {
     super.key,
     this.weatherRepository,
     this.alertsRepository,
+    this.active = true,
   });
+  final bool active;
   final WeatherRepository? weatherRepository;
   final AlertsRepository? alertsRepository;
 
@@ -59,6 +63,10 @@ class _PlanificationScreenState extends State<PlanificationScreen> {
   void didChangeDependencies() {
     super.didChangeDependencies();
     final farmId = context.watch<FarmProvider>().selectedFarmId;
+    if (widget.weatherRepository == null && OfflineRuntime.shared != null) {
+      final forecast = context.watch<WeatherProvider>().forecast;
+      if (forecast?.farmId == farmId) _forecast = forecast;
+    }
     if (_farmId != farmId) {
       _farmId = farmId;
       _request++;
@@ -75,7 +83,16 @@ class _PlanificationScreenState extends State<PlanificationScreen> {
     }
   }
 
+  @override
+  void didUpdateWidget(covariant PlanificationScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.active && !oldWidget.active) {
+      WidgetsBinding.instance.addPostFrameCallback((_) { if (mounted) _load(); });
+    }
+  }
+
   Future<void> _load() async {
+    if (!widget.active || OfflineRuntime.shared?.engine.foreground == false) return;
     final farmId = _farmId;
     if (farmId == null) return;
     final request = ++_request;
@@ -88,14 +105,21 @@ class _PlanificationScreenState extends State<PlanificationScreen> {
     await Future.wait([
       () async {
         try {
-          final forecast = await _weather.getForecast(farmId, days: 7);
+          WeatherForecast? forecast;
+          if (widget.weatherRepository == null &&
+              OfflineRuntime.shared != null) {
+            final provider = context.read<WeatherProvider>();
+            await provider.fetchForecast(farmId);
+            forecast = provider.forecast;
+          } else {
+            forecast = await _weather.getForecast(farmId, days: 7);
+          }
           if (mounted && request == _request) {
             setState(() => _forecast = forecast);
           }
         } catch (_) {
           if (mounted && request == _request) {
             setState(() {
-              _forecast = null;
               _weatherError = 'No se pudo actualizar el pronóstico.';
             });
           }
@@ -122,6 +146,7 @@ class _PlanificationScreenState extends State<PlanificationScreen> {
   }
 
   DailyWeather? _weatherOn(DateTime date) {
+    if (_forecast?.freshness == 'historical') return null;
     for (final day in _forecast?.daily ?? <DailyWeather>[]) {
       if (_sameDay(day.date, date)) return day;
     }
@@ -180,6 +205,14 @@ class _PlanificationScreenState extends State<PlanificationScreen> {
           physics: const AlwaysScrollableScrollPhysics(),
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
           children: [
+            if (_forecast case final forecast?)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Text(
+                  '${forecast.freshness == 'historical' ? 'Referencia histórica; no representa condiciones actuales.' : 'Último pronóstico disponible.'}${forecast.updatedAt == null ? '' : ' Actualizado: ${forecast.updatedAt}'}${forecast.offline ? ' Sin conexión. Información guardada.' : ''}',
+                  style: const TextStyle(fontSize: 12),
+                ),
+              ),
             DropdownButtonFormField<String>(
               key: ValueKey(_farmId),
               initialValue: _farmId,

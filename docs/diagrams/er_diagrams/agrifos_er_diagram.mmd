@@ -1,6 +1,6 @@
 erDiagram
     %% AUTH_USER is external Supabase auth.users, represented by its id only.
-    %% SQLAlchemy models at main f986ccb; 2026-10-08.
+    %% SQLAlchemy models: offline-first proposal from main 8182f9f; October 2026.
     AUTH_USER ||--o| USER : id
     USER ||--o{ FARM : user_id
     CROP ||--o{ PARCEL : crop_id
@@ -61,6 +61,7 @@ erDiagram
         datetime updated_at
     }
     FARM {
+        int revision
         uuid user_id FK
         string name
         float area_hectares
@@ -71,6 +72,7 @@ erDiagram
         datetime updated_at
     }
     PARCEL {
+        int revision
         uuid farm_id FK
         uuid crop_id FK
         uuid variety_id FK "nullable"
@@ -96,6 +98,7 @@ erDiagram
         datetime updated_at
     }
     READING {
+        int revision
         uuid parcel_id FK
         float nitrogen
         float phosphorus
@@ -108,6 +111,7 @@ erDiagram
         uuid id PK
     }
     LAB_ANALYSIS {
+        int revision
         uuid parcel_id FK
         string sample_code "nullable"
         datetime sampled_at "nullable"
@@ -321,4 +325,42 @@ erDiagram
         string unit
         date harvest_date
         uuid id PK
+    }
+
+    USER ||--o{ SYNC_RECEIPT : user_id
+    USER ||--o{ SYNC_CURSOR : user_id
+    %% SYNC_CHANGE intentionally has no domain FK: tombstones survive deletion.
+    SYNC_CHANGE {
+        bigint sequence PK
+        uuid user_id
+        uuid farm_id
+        string entity
+        uuid entity_id
+        string operation
+        jsonb data
+    }
+    SYNC_RECEIPT {
+        uuid user_id PK,FK
+        uuid operation_id PK
+        string request_hash
+        jsonb response
+        timestamptz created_at
+    }
+    SYNC_CURSOR {
+        uuid id PK
+        uuid user_id FK
+        bigint after_sequence
+        bigint until_sequence "nullable"
+        timestamptz expires_at
+    }
+    WEATHER_HTTP_CACHE {
+        string key PK
+        jsonb payload "nullable"
+        string last_modified "nullable"
+        timestamptz fetched_at "nullable"
+        timestamptz validated_at "nullable"
+        timestamptz fresh_until "nullable"
+        timestamptz retry_at "nullable"
+        int failures
+        string error_code "nullable"
     }

@@ -143,6 +143,11 @@ Las ecuaciones, factores, supuestos, ejemplos y referencias se documentan en [`d
 | `geolocator` / `geocoding` | Ubicación y geocodificación de fincas |
 | `google_fonts` | Tipografías de la interfaz |
 | `flutter_map` | Renderizado de mapas OpenStreetMap para ubicar fincas y parcelas |
+| `drift` / `cryptography` | SQLite persistente y cifrado autenticado de datos locales privados |
+| `flutter_secure_storage` | Sesión, claves por cuenta y autorización local en el almacén seguro del sistema |
+| `connectivity_plus` | Cambios de conectividad; la disponibilidad real se verifica mediante la API |
+| `path_provider` / `uuid` | Ruta local e identificadores estables para operaciones |
+| `url_launcher` | Enlaces de atribución meteorológica y licencia |
 | `latlong2` | Tipos de coordenadas geográficas para `flutter_map` |
 
 ## Variables de entorno
@@ -179,7 +184,7 @@ WEATHER_CACHE_STALE_SECONDS=21600
 WEATHER_CACHE_RETRY_SECONDS=60
 ```
 
-La caché meteorológica se comparte entre solicitudes dentro de cada proceso del backend. Conserva el pronóstico vigente durante `WEATHER_CACHE_FRESH_SECONDS` y agrupa consultas simultáneas para la misma finca, coordenadas y cantidad de días. Al vencer, consulta al proveedor; si los datos son iguales, reutiliza el pronóstico y renueva su vigencia. Ante un fallo, espera `WEATHER_CACHE_RETRY_SECONDS` antes de reintentar y puede servir el último pronóstico hasta `WEATHER_CACHE_STALE_SECONDS` desde su última consulta exitosa. La caché se pierde al reiniciar y no se comparte entre workers.
+La caché meteorológica persiste en PostgreSQL y comparte pronósticos públicos entre workers y ubicaciones equivalentes, sin incluir identidades de fincas en la clave compartida. Respeta `Expires`, `Last-Modified`, 304 y `Retry-After` de los proveedores. Puede servir el último resultado válido como stale o histórico, con fecha y atribución; el histórico no genera nuevas alertas. Flutter conserva su propia copia cifrada y reutiliza consultas durante 15 minutos, solamente con pantallas activas y conectividad comprobada. Véanse la [arquitectura offline](docs/offline-first.md) y la [validación](docs/offline-validation.md).
 
 App Flutter (`app_flutter/.env`):
 
@@ -515,3 +520,12 @@ Orgánico muestra Bocashi, Biol y Compost de pulpa de café, cantidades de refer
 - [Estado de módulos y límites](docs/ESTADO_IMPLEMENTADO.md).
 - [Arquitectura](docs/diagrams/architecture_diagram.mmd) y [actividad de fertilización](docs/diagrams/activity_diagram.mmd).
 - [Clases persistidas](docs/diagrams/class_diagram.mmd) y [ER completo](docs/diagrams/er_diagrams/agrifos_er_diagram.mmd).
+
+## Offline-first: propuesta de desarrollo
+
+La rama `feat/offline-first-foundation` añade lectura local y captura diferida de
+lecturas OTG y muestras de laboratorio. Requiere aplicar Alembic y un primer
+acceso online. No amplía el cálculo agronómico offline ni el CRUD de finanzas.
+Consultar [alcance y uso](docs/offline-first.md), [auditoría](docs/offline-audit.md)
+y [validación y límites](docs/offline-validation.md). APK, OTG y almacenes seguros
+nativos requieren validación manual; no se aceptaron licencias Android.

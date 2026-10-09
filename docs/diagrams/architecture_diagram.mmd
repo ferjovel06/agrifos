@@ -1,5 +1,5 @@
 flowchart LR
-    Sensor["Sensor de suelo genérico 7 en 1"] -->|USB OTG Android| App["Flutter móvil / web"]
+    Sensor["Sensor de suelo genérico 7 en 1"] -->|USB OTG Android| App["Flutter nativo offline / web online"]
     Lab["Captura manual de laboratorio"] --> App
     App <-->|Sesión y MFA TOTP| Auth["Supabase Auth"]
     App <-->|REST y JWT| API["FastAPI: autorización por rol y finca"]
@@ -11,3 +11,9 @@ flowchart LR
     API --> Pheno["Plantillas e instancias fenológicas"]
     API --> Climate["Pronóstico y alertas lluvia/calor"]
     Climate <-->|HTTP| Weather["Open-Meteo / proveedor de respaldo"]
+    App <--> Local[("SQLite Drift: entidades cifradas, outbox y snapshots")]
+    App <--> Vault["Almacén seguro: sesión y clave por cuenta"]
+    Local <--> Sync["Motor central: UUID estable, reintentos y conflictos"]
+    Sync <-->|Operaciones idempotentes y cursor privado| API
+    DB --- Journal["Diario, revisiones, tombstones y recibos"]
+    Climate <--> Cache["Caché HTTP y producto normalizado en PostgreSQL"]

@@ -5,12 +5,15 @@ import 'package:http/http.dart' as http;
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../core/env.dart';
+import '../../core/network_health.dart';
 
 /// Thrown when the backend returns a non-2xx response.
 class ApiException implements Exception {
   final int statusCode;
   final String message;
-  ApiException(this.statusCode, this.message);
+  final String? retryAfter;
+  final dynamic detail;
+  ApiException(this.statusCode, this.message, {this.retryAfter, this.detail});
 
   @override
   String toString() => message;
@@ -30,14 +33,26 @@ class ApiAuthException implements Exception {
 /// and mapping error responses to [ApiException].
 class ApiClient {
   final http.Client _http;
+  final NetworkHealth _network;
+  final String? baseUrl;
+  final String? Function()? tokenProvider;
+  final String? Function()? userProvider;
 
-  ApiClient({http.Client? httpClient}) : _http = httpClient ?? http.Client();
+  ApiClient({
+    http.Client? httpClient,
+    NetworkHealth? network,
+    this.baseUrl,
+    this.tokenProvider,
+    this.userProvider,
+  }) : _http = httpClient ?? http.Client(),
+       _network = network ?? NetworkHealth.shared;
 
-  Uri _uri(String path) => Uri.parse('${Env.apiBaseUrl}$path');
+  Uri _uri(String path) => Uri.parse('${baseUrl ?? Env.apiBaseUrl}$path');
 
   Future<Map<String, String>> _headers() async {
-    final session = Supabase.instance.client.auth.currentSession;
-    final token = session?.accessToken;
+    final token = tokenProvider != null
+        ? tokenProvider!()
+        : Supabase.instance.client.auth.currentSession?.accessToken;
     if (token == null) {
       throw ApiAuthException(
         'No hay una sesión activa. Inicia sesión de nuevo.',
@@ -49,15 +64,36 @@ class ApiClient {
     };
   }
 
-  Future<Map<String, dynamic>> post(
+  Future<Map<String, dynamic>> post(String path, Map<String, dynamic> body) =>
+      _post(path, body);
+
+  Future<Map<String, dynamic>> postForUser(
     String path,
     Map<String, dynamic> body,
-  ) async {
+    String user,
+  ) => _post(path, body, expectedUser: user);
+
+  Future<Map<String, dynamic>> _post(
+    String path,
+    Map<String, dynamic> body, {
+    String? expectedUser,
+  }) async {
     final headers = await _headers();
+    if (expectedUser != null &&
+        (userProvider != null
+                ? userProvider!()
+                : Supabase.instance.client.auth.currentUser?.id) !=
+            expectedUser) {
+      throw ApiAuthException('La cuenta cambió. Se detuvo la sincronización.');
+    }
     final response = await _send(
       _http.post(_uri(path), headers: headers, body: jsonEncode(body)),
     );
-    return _decode(response);
+    final decoded = _decode(response);
+    if (decoded is! Map<String, dynamic>) {
+      throw ApiException(502, 'El servidor devolvió una confirmación inválida.');
+    }
+    return decoded;
   }
 
   Future<dynamic> get(String path, {Map<String, String>? query}) async {
@@ -86,13 +122,17 @@ class ApiClient {
 
   Future<http.Response> _send(Future<http.Response> request) async {
     try {
-      return await request.timeout(const Duration(seconds: 15));
+      final response = await request.timeout(const Duration(seconds: 15));
+      _network.success();
+      return response;
     } on TimeoutException {
+      _network.failure();
       throw ApiException(
         408,
         'El servidor tardó demasiado en responder. Intenta nuevamente.',
       );
     } on http.ClientException {
+      _network.failure();
       throw ApiException(
         0,
         'No se pudo conectar con el servidor. Revisa tu conexión.',
@@ -103,18 +143,29 @@ class ApiClient {
   dynamic _decode(http.Response response) {
     if (response.statusCode >= 200 && response.statusCode < 300) {
       if (response.body.isEmpty) return null;
-      return jsonDecode(utf8.decode(response.bodyBytes));
+      try {
+        return jsonDecode(utf8.decode(response.bodyBytes));
+      } on FormatException {
+        throw ApiException(502, 'El servidor devolvió una respuesta inválida.');
+      }
     }
 
     String message = 'Error del servidor (${response.statusCode}).';
+    dynamic detail;
     try {
       final decoded = jsonDecode(utf8.decode(response.bodyBytes));
       if (decoded is Map && decoded['detail'] != null) {
         message = decoded['detail'].toString();
+        detail = decoded['detail'];
       }
     } catch (_) {
       // response body wasn't JSON, keep the default message
     }
-    throw ApiException(response.statusCode, message);
+    throw ApiException(
+      response.statusCode,
+      message,
+      retryAfter: response.headers['retry-after'],
+      detail: detail,
+    );
   }
 }
