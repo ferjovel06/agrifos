@@ -1,5 +1,9 @@
+import 'dart:async';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
+import 'package:app_flutter/data/api/api_client.dart';
+import 'package:app_flutter/data/api/fertilization_repository.dart';
+import 'package:app_flutter/data/sync/offline_runtime.dart';
 import '../support/offline_fixture.dart';
 
 void main() {
@@ -9,8 +13,38 @@ void main() {
     await f.prepare();
   });
   tearDown(() async {
+    OfflineRuntime.shared = null;
     await f.close();
   });
+  test('a pending laboratory sample cannot trigger a remote agronomic calculation', () async {
+    await f.queue(entity:'sample', kind:'lab_analyses');
+    OfflineRuntime.shared = f.runtime;
+    final repository = FertilizationRepository(client:f.client);
+    await expectLater(repository.createFromLabAnalysis(parcelId:'parcel-a',labAnalysisId:'sample',
+      yieldUnit:'qq_gold_ha',fruitStage:'green'), throwsA(isA<ApiException>()));
+    expect(f.calls, isEmpty);
+    expect((await f.database.operations('farmer-a')).single['status'], 'pending');
+  });
+  test(
+    'an old authorization response cannot restore a grant after explicit logout',
+    () async {
+      final response = Completer<http.Response>();
+      final sent = Completer<void>();
+      f.handler = (_) {
+        sent.complete();
+        return response.future;
+      };
+      final authorization = f.runtime.authorize('farmer-a');
+      await sent.future;
+      await f.runtime.leave(explicit: true);
+      response.complete(
+        OfflineFixture.json({'id': 'farmer-a', 'role': 'farmer'}),
+      );
+      expect(await authorization, isFalse);
+      expect(await f.vault.read('grant:farmer-a'), isNull);
+      expect(f.runtime.localAccess, isFalse);
+    },
+  );
   test(
     'failed first weather download is throttled without inventing a forecast',
     () async {

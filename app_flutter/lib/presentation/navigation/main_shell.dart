@@ -36,6 +36,7 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    OfflineRuntime.shared?.network.addListener(_networkChanged);
   }
 
   @override
@@ -48,6 +49,10 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
     }
   }
 
+  void _networkChanged() {
+    if (OfflineRuntime.shared?.network.operational == true) _activateWeather();
+  }
+
   void _activateWeather() {
     _weatherTimer?.cancel();
     if (!_foreground ||
@@ -57,7 +62,11 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
     }
     final farm = _weatherFarm;
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted && _foreground && farm != null && farm == _weatherFarm && (_currentIndex == 0 || _currentIndex == 2)) {
+      if (mounted &&
+          _foreground &&
+          farm != null &&
+          farm == _weatherFarm &&
+          (_currentIndex == 0 || _currentIndex == 2)) {
         unawaited(context.read<WeatherProvider>().fetchForecast(farm));
       }
     });
@@ -78,6 +87,7 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
   @override
   void dispose() {
     _weatherTimer?.cancel();
+    OfflineRuntime.shared?.network.removeListener(_networkChanged);
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }

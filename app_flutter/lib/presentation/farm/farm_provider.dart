@@ -65,6 +65,7 @@ class FarmProvider extends ChangeNotifier {
       _selectedFarmId = null;
       _loadedUserId = null;
       _hasLoadedOnce = false;
+      errorMessage = null;
       status = FarmStatus.loading;
       notifyListeners();
       return;
@@ -121,6 +122,7 @@ class FarmProvider extends ChangeNotifier {
     required double latitude,
     required double longitude,
   }) async {
+    final user = _loadedUserId;
     errorMessage = null;
     notifyListeners();
 
@@ -131,6 +133,7 @@ class FarmProvider extends ChangeNotifier {
         latitude: latitude,
         longitude: longitude,
       );
+      if (_loadedUserId != user) return false;
       farms = [farm, ...farms];
       _selectedFarmId = farm.id;
       _hasLoadedOnce = true;
@@ -138,14 +141,19 @@ class FarmProvider extends ChangeNotifier {
       notifyListeners();
       return true;
     } on ApiAuthException catch (e) {
+      if (_loadedUserId != user) return false;
+      if (_loadedUserId != user) return false;
       errorMessage = e.message;
       notifyListeners();
       return false;
     } on ApiException catch (e) {
+      if (_loadedUserId != user) return false;
+      if (_loadedUserId != user) return false;
       errorMessage = e.message;
       notifyListeners();
       return false;
     } catch (e) {
+      if (_loadedUserId != user) return false;
       errorMessage = 'No se pudo registrar la finca: $e';
       notifyListeners();
       return false;

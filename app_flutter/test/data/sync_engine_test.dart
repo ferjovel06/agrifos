@@ -13,6 +13,19 @@ void main() {
   tearDown(() async {
     await f.close();
   });
+  for (final malformed in ['invalid-json', '{"data":{"id":"another-record","revision":1}}']) {
+    test('malformed acknowledgement is retryable and cannot replace the local entity: $malformed', () async {
+      await f.queue();
+      f.handler = (request) async {
+        if (request.url.path == '/users/me') return OfflineFixture.json({'id':f.user,'role':'farmer'});
+        if (request.url.path == '/sync/changes') return OfflineFixture.json({'changes':[],'cursor':'next','has_more':false});
+        return http.Response(malformed,200);
+      };
+      await f.engine.synchronize();
+      expect((await f.database.operations(f.user!)).single['status'], 'retry_wait');
+      expect((await f.database.entities(f.user!,'readings')).single['id'], 'reading');
+    });
+  }
   test(
     'expired cursor prepares a new snapshot without losing queued mutations',
     () async {

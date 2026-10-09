@@ -190,10 +190,17 @@ class SyncEngine extends ChangeNotifier {
       if (!_same(user)) {
         return; // Restart recovery replays this same operation ID.
       }
+      final confirmed = response['data'];
+      if (confirmed is! Map<String, dynamic> ||
+          confirmed['id'] != op['entity_id'] ||
+          confirmed['revision'] is! int || (confirmed['revision'] as int) < 1 ||
+          (response['operation_id'] != null && response['operation_id'] != id)) {
+        throw ApiException(502, 'No se recibió una confirmación válida del cambio.');
+      }
       await database.acknowledge(
         user,
         op,
-        response['data'] as Map<String, dynamic>,
+        confirmed,
       );
     } on ApiAuthException {
       await database.mark(user, id, 'pending', error: 'session_required');

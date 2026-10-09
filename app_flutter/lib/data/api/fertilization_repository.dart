@@ -42,6 +42,13 @@ class FertilizationRepository {
     }..removeWhere((_, value) => value == null);
     final runtime = OfflineRuntime.shared;
     final account = runtime?.requireAccount();
+    if (runtime != null) {
+      if (!runtime.network.operational) throw ApiException(0, 'Necesitas conexión para calcular un plan nuevo.');
+      final rows = await runtime.read('lab_analyses', parent: parcelId);
+      if (rows.any((row) => row['id'] == labAnalysisId && row['_sync_status'] != 'synced')) {
+        throw ApiException(409, 'Sincroniza o revisa la muestra antes de calcular un plan.');
+      }
+    }
     final response = await _client.post('/fertilization/recommendations', body);
     if (runtime != null) {
       if (runtime.requireAccount() != account) {
@@ -93,6 +100,15 @@ class FertilizationRepository {
     }..removeWhere((_, value) => value == null);
     final runtime = OfflineRuntime.shared;
     final account = runtime?.requireAccount();
+    if (runtime != null) {
+      if (!runtime.network.operational) throw ApiException(0, 'Necesitas conexión para calcular un plan nuevo.');
+      if (readingId != null) {
+        final rows = await runtime.read('readings', parent: parcelId);
+        if (rows.any((row) => row['id'] == readingId && row['_sync_status'] != 'synced')) {
+          throw ApiException(409, 'Sincroniza o revisa la lectura antes de calcular un plan.');
+        }
+      }
+    }
     final response = await _client.post('/fertilization/recommendations', body);
     if (runtime != null) {
       if (runtime.requireAccount() != account) {

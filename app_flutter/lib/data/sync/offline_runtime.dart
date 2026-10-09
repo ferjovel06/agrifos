@@ -283,7 +283,7 @@ class OfflineRuntime extends ChangeNotifier {
     final stored = await database.cache(user, key);
     if (account != user) throw ApiAuthException('La cuenta cambió.');
     if (stored != null) return stored['data'];
-    if (!network.canAttempt) {
+    if (!network.operational) {
       throw ApiException(0, 'Esta información necesita una descarga inicial.');
     }
     final data = await client.get(path, query: query);

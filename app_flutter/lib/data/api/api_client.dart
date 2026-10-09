@@ -89,7 +89,11 @@ class ApiClient {
     final response = await _send(
       _http.post(_uri(path), headers: headers, body: jsonEncode(body)),
     );
-    return _decode(response);
+    final decoded = _decode(response);
+    if (decoded is! Map<String, dynamic>) {
+      throw ApiException(502, 'El servidor devolvió una confirmación inválida.');
+    }
+    return decoded;
   }
 
   Future<dynamic> get(String path, {Map<String, String>? query}) async {
@@ -139,7 +143,11 @@ class ApiClient {
   dynamic _decode(http.Response response) {
     if (response.statusCode >= 200 && response.statusCode < 300) {
       if (response.body.isEmpty) return null;
-      return jsonDecode(utf8.decode(response.bodyBytes));
+      try {
+        return jsonDecode(utf8.decode(response.bodyBytes));
+      } on FormatException {
+        throw ApiException(502, 'El servidor devolvió una respuesta inválida.');
+      }
     }
 
     String message = 'Error del servidor (${response.statusCode}).';

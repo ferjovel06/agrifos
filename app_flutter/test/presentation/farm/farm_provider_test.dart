@@ -1,9 +1,26 @@
+import 'dart:async';
 import 'package:app_flutter/data/api/farm_repository.dart';
 import 'package:app_flutter/domain/entities/farm.dart';
 import 'package:app_flutter/presentation/farm/farm_provider.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  test(
+    'a late response cannot repopulate farms after an account boundary',
+    () async {
+      final reply = Completer<List<Farm>>();
+      final provider = FarmProvider(
+        farmRepository: _DeferredFarmRepository(reply.future),
+      );
+      final pending = provider.loadFarms(userId: 'user-1');
+      await provider.loadFarms(userId: null);
+      reply.complete([_farm('private', 'Private farm')]);
+      await pending;
+      expect(provider.farms, isEmpty);
+      expect(provider.selectedFarmId, isNull);
+      provider.dispose();
+    },
+  );
   test('selects the first farm initially and allows changing it', () async {
     final first = _farm('farm-1', 'Finca Norte');
     final second = _farm('farm-2', 'Finca Sur');
@@ -40,6 +57,13 @@ void main() {
 
     expect(provider.currentFarm, same(first));
   });
+}
+
+class _DeferredFarmRepository extends FarmRepository {
+  _DeferredFarmRepository(this.result);
+  final Future<List<Farm>> result;
+  @override
+  Future<List<Farm>> getFarms() => result;
 }
 
 class _FakeFarmRepository extends FarmRepository {

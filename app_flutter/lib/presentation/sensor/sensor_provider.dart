@@ -21,6 +21,7 @@ class SensorProvider extends ChangeNotifier {
   String? saveErrorMessage;
   SensorDiagnostic? savedDiagnosis;
   Reading? savedReading;
+  int _saveGeneration = 0;
 
   SensorProvider({ReadingsRepository? readingsRepository})
     : _readingsRepository = readingsRepository ?? ReadingsRepository() {
@@ -166,6 +167,7 @@ class SensorProvider extends ChangeNotifier {
     final reading = lastReading;
     if (reading == null || saveStatus == SaveStatus.saving) return;
 
+    final generation = _saveGeneration;
     saveStatus = SaveStatus.saving;
     saveErrorMessage = null;
     notifyListeners();
@@ -175,19 +177,25 @@ class SensorProvider extends ChangeNotifier {
         parcelId: parcelId,
         reading: reading,
       );
+      if (generation != _saveGeneration) return;
       savedDiagnosis = savedReading.diagnosis;
       this.savedReading = savedReading;
       saveStatus = SaveStatus.saved;
       notifyListeners();
     } on ApiAuthException catch (e) {
+      if (generation != _saveGeneration) return;
+      if (generation != _saveGeneration) return;
       saveStatus = SaveStatus.error;
       saveErrorMessage = e.message;
       notifyListeners();
     } on ApiException catch (e) {
+      if (generation != _saveGeneration) return;
+      if (generation != _saveGeneration) return;
       saveStatus = SaveStatus.error;
       saveErrorMessage = e.message;
       notifyListeners();
     } catch (e) {
+      if (generation != _saveGeneration) return;
       saveStatus = SaveStatus.error;
       saveErrorMessage = 'No se pudo guardar la lectura: $e';
       notifyListeners();
@@ -195,6 +203,7 @@ class SensorProvider extends ChangeNotifier {
   }
 
   Future<void> disconnect() async {
+    _saveGeneration++;
     _userRequestedDisconnect = true;
     await _service.dispose();
     status = SensorStatus.disconnected;
@@ -209,6 +218,7 @@ class SensorProvider extends ChangeNotifier {
 
   @override
   void dispose() {
+    _saveGeneration++;
     _userRequestedDisconnect = true;
     _usbAttachSub?.cancel();
     _nativeDisconnectSub?.cancel();
