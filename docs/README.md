@@ -6,6 +6,7 @@ Base `origin/main` (`8182f9f`); propuesta offline-first en rama independiente, o
 |---|---|
 | [README del proyecto](../README.md) | Presentación, configuración y ejecución |
 | [Offline-first](offline-first.md) | Alcance, sincronización, seguridad y uso |
+| [Refactorización offline](offline-refactor.md) | Auditoría, métricas y simplificaciones aplicadas |
 | [Validación offline](offline-validation.md) | Pruebas reales y pendientes |
 | [Estado implementado](ESTADO_IMPLEMENTADO.md) | Capacidades, límites y fuentes de verdad |
 | [Motor](agrifos_engine_documentation.md) | Contrato, cálculo, unidades y persistencia |
