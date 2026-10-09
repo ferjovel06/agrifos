@@ -1,15 +1,69 @@
+name: agrifos
+
+x-container-defaults: &container-defaults
+  restart: unless-stopped
+  security_opt: [no-new-privileges:true]
+  logging:
+    driver: json-file
+    options:
+      max-size: "10m"
+      max-file: "3"
+
 services:
+  db:
+    <<: *container-defaults
+    image: postgres:17-alpine
+    user: postgres
+    environment:
+      POSTGRES_DB: agrifos
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in a private env file}"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: [CMD-SHELL, "pg_isready -U postgres -d agrifos"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
   api:
-    image: agrifos-backend:local
+    <<: *container-defaults
+    image: agrifos-backend:production
     build:
       context: backend
       target: runtime
-    env_file: backend/.env
+    env_file: "${API_ENV_FILE:-backend/.env}"
+    environment:
+      ENV: production
+      APP_DEBUG: "false"
+      DATABASE_URL: "${DATABASE_URL:?Set DATABASE_URL for the local database}"
+      ALLOWED_ORIGINS: "${ALLOWED_ORIGINS:-}"
+    read_only: true
+    cap_drop: [ALL]
+    tmpfs: [/tmp]
+    command: [uvicorn, app.main:app, --host, "0.0.0.0", --port, "8000", --proxy-headers, --forwarded-allow-ips, "*"]
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3)"]
+      interval: 30s
+      timeout: 5s
+      start_period: 10s
+      retries: 3
+
+  proxy:
+    <<: *container-defaults
+    image: nginxinc/nginx-unprivileged:1.28-alpine
+    read_only: true
+    cap_drop: [ALL]
+    tmpfs: [/tmp]
     ports:
-      - "${API_BIND_ADDRESS:-127.0.0.1}:${API_PORT:-8000}:8000"
+      - "${HTTP_BIND_ADDRESS:-127.0.0.1}:${HTTP_PORT:-8080}:8080"
     volumes:
-      - ./backend/app:/app/app:ro
-    command: [uvicorn, app.main:app, --host, "0.0.0.0", --port, "8000", --reload]
+      - ./deploy/nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      api:
+        condition: service_healthy
 
   backend-tests:
     profiles: [test]
@@ -18,3 +72,8 @@ services:
       context: backend
       target: test
     network_mode: none
+
+volumes:
+  postgres-data:
+    name: "${POSTGRES_VOLUME:-agrifos-postgres-data}"
+    external: ${POSTGRES_VOLUME_EXTERNAL:-false}
