@@ -538,8 +538,7 @@ class _SensorScreenState extends State<SensorScreen> {
             ),
             const SizedBox(height: 16),
             ConventionalFertilizationCard(
-              scenario:
-                  _fertilizationRecommendation?.diagnosticSummaryScenario,
+              scenario: _fertilizationRecommendation?.diagnosticSummaryScenario,
               application:
                   _fertilizationRecommendation?.nextYoungCropApplication,
               isLoading: _isLoadingFertilization,
@@ -571,7 +570,14 @@ class _SensorScreenState extends State<SensorScreen> {
     final parcelRevision = _loadedParcelRevision;
     final loadToken = _parcelLoadToken;
     final latestReadingProvider = context.read<LatestReadingProvider>();
-    await sensor.saveCurrentReading(parcel.id);
+    final sampling = await _samplingContext();
+    if (sampling == null || !mounted) return;
+    await sensor.saveCurrentReading(
+      parcel.id,
+      pointId: sampling.$1,
+      depthCm: sampling.$2,
+      soilType: sampling.$3,
+    );
     if (sensor.saveStatus == SaveStatus.saved &&
         _isCurrentParcelLoad(
           parcel.id,
@@ -592,6 +598,83 @@ class _SensorScreenState extends State<SensorScreen> {
         );
       }
     }
+  }
+
+  Future<(String, double?, String?)?> _samplingContext() async {
+    final form = GlobalKey<FormState>();
+    String point = '', depth = '', soil = '';
+    final result = await showDialog<(String, double?, String?)>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Identificar muestra'),
+        content: Form(
+          key: form,
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text(
+                  'Repite el mismo identificador solo para mediciones del mismo punto físico. La exactitud requiere comparación de laboratorio.',
+                ),
+                TextFormField(
+                  onChanged: (value) => point = value,
+                  maxLength: 120,
+                  decoration: const InputDecoration(
+                    labelText: 'Punto de muestreo',
+                  ),
+                  validator: (value) => value == null || value.trim().isEmpty
+                      ? 'Identifica el punto.'
+                      : null,
+                ),
+                TextFormField(
+                  onChanged: (value) => depth = value,
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
+                  decoration: const InputDecoration(
+                    labelText: 'Profundidad (cm, opcional)',
+                  ),
+                  validator: (value) {
+                    if (value == null || value.trim().isEmpty) return null;
+                    final number = double.tryParse(value.replaceAll(',', '.'));
+                    return number == null || !number.isFinite || number < 0
+                        ? 'Revisa la profundidad.'
+                        : null;
+                  },
+                ),
+                TextFormField(
+                  onChanged: (value) => soil = value,
+                  maxLength: 120,
+                  decoration: const InputDecoration(
+                    labelText: 'Tipo de suelo documentado (opcional)',
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            onPressed: () {
+              if (!form.currentState!.validate()) return;
+              Navigator.pop(dialogContext, (
+                point.trim(),
+                depth.trim().isEmpty
+                    ? null
+                    : double.parse(depth.replaceAll(',', '.')),
+                soil.trim().isEmpty ? null : soil.trim(),
+              ));
+            },
+            child: const Text('Guardar original'),
+          ),
+        ],
+      ),
+    );
+    return result;
   }
 
   Future<void> _requestSensorRecommendation({
@@ -644,7 +727,7 @@ class _SensorScreenState extends State<SensorScreen> {
               diagnosis.parameter('potassium')?.level,
             ),
             ph: reading.ph,
-            electricalConductivity: reading.ec / 1000,
+            electricalConductivity: reading.ec,
           );
       if (!_isCurrentParcelLoad(
         parcel.id,

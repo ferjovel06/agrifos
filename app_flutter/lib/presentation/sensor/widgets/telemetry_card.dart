@@ -42,9 +42,9 @@ class TelemetryCard extends StatelessWidget {
     final nitrogen = diagnosis?.parameter('nitrogen');
     final phosphorus = diagnosis?.parameter('phosphorus');
     final potassium = diagnosis?.parameter('potassium');
-    final phLevel = reading == null
+    final phLevel = reading?.ph == null || reading?.measurement != null
         ? null
-        : classifySoilParameter(SoilParameterId.ph, reading!.ph);
+        : classifySoilParameter(SoilParameterId.ph, reading!.ph!);
 
     return Container(
       width: double.infinity,
@@ -80,10 +80,10 @@ class TelemetryCard extends StatelessWidget {
             children: [
               Expanded(
                 child: _TelemetryMetric(
-                  label: 'HUMEDAD\nVOL.',
-                  value: reading == null
+                  label: 'HUMEDAD\nSUELO',
+                  value: reading?.humidity == null
                       ? '—'
-                      : '${reading!.humidity.toStringAsFixed(0)}%',
+                      : '${reading!.humidity!.toStringAsFixed(0)}%',
                   color: const Color(0xFF4D8DFF),
                 ),
               ),
@@ -91,9 +91,9 @@ class TelemetryCard extends StatelessWidget {
               Expanded(
                 child: _TelemetryMetric(
                   label: 'TEMP.\nSUELO',
-                  value: reading == null
+                  value: reading?.temperature == null
                       ? '—'
-                      : '${reading!.temperature.toStringAsFixed(0)}°C',
+                      : '${reading!.temperature!.toStringAsFixed(0)}°C',
                   color: const Color(0xFFFFA000),
                 ),
               ),
@@ -101,7 +101,7 @@ class TelemetryCard extends StatelessWidget {
               Expanded(
                 child: _TelemetryMetric(
                   label: 'PH ACTUAL',
-                  value: reading?.ph.toStringAsFixed(1) ?? '—',
+                  value: reading?.ph?.toStringAsFixed(1) ?? '—',
                   color: phLevel == null
                       ? _mutedText
                       : serverPh == null
@@ -124,7 +124,7 @@ class TelemetryCard extends StatelessWidget {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text('MACRONUTRIENTES (MG/KG)', style: _sectionLabelStyle),
-                    Text('NIVEL ÓPTIMO', style: _sectionLabelStyle),
+                    Text('LECTURA ORIGINAL', style: _sectionLabelStyle),
                   ],
                 ),
                 const SizedBox(height: 13),
@@ -132,9 +132,10 @@ class TelemetryCard extends StatelessWidget {
                   label: 'N',
                   value: reading?.nitrogen,
                   optimalMax: 30,
-                  level: reading == null
+                  level:
+                      reading?.nitrogen == null || reading?.measurement != null
                       ? null
-                      : NpkThresholds.nitrogen(reading!.nitrogen),
+                      : NpkThresholds.nitrogen(reading!.nitrogen!),
                   diagnosticLevel: nitrogen?.level,
                 ),
                 const SizedBox(height: 12),
@@ -142,9 +143,11 @@ class TelemetryCard extends StatelessWidget {
                   label: 'P',
                   value: reading?.phosphorus,
                   optimalMax: 20,
-                  level: reading == null
+                  level:
+                      reading?.phosphorus == null ||
+                          reading?.measurement != null
                       ? null
-                      : NpkThresholds.phosphorus(reading!.phosphorus),
+                      : NpkThresholds.phosphorus(reading!.phosphorus!),
                   diagnosticLevel: phosphorus?.level,
                 ),
                 const SizedBox(height: 12),
@@ -152,14 +155,28 @@ class TelemetryCard extends StatelessWidget {
                   label: 'K',
                   value: reading?.potassium,
                   optimalMax: 156,
-                  level: reading == null
+                  level:
+                      reading?.potassium == null || reading?.measurement != null
                       ? null
-                      : NpkThresholds.potassium(reading!.potassium),
+                      : NpkThresholds.potassium(reading!.potassium!),
                   diagnosticLevel: potassium?.level,
                 ),
               ],
             ),
           ),
+          if (reading?.measurement != null) ...[
+            const SizedBox(height: 12),
+            Text(
+              'Adquirida: ${reading!.acquiredAt.toLocal().toIso8601String()}\n'
+              'Trama íntegra (CRC). Sin calibración validada; exactitud analítica desconocida.',
+              style: const TextStyle(color: _mutedText, fontSize: 11),
+            ),
+            for (final entry in reading!.measurement!.variables.entries)
+              Text(
+                '${entry.value.analyte}: ${entry.value.rawValue} ${entry.value.unit} · ${entry.value.readStatus}',
+                style: const TextStyle(color: Colors.white70, fontSize: 11),
+              ),
+          ],
           if (_statusMessage != null) ...[
             const SizedBox(height: 12),
             Container(
@@ -222,7 +239,7 @@ class TelemetryCard extends StatelessWidget {
         const Padding(
           padding: EdgeInsets.only(left: 17, top: 2),
           child: Text(
-            'Sensor de suelo 7 en 1',
+            'Perfil físico por verificar',
             style: TextStyle(
               color: Colors.white,
               fontSize: 16,
