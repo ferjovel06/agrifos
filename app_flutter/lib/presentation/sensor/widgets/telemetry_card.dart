@@ -222,7 +222,7 @@ class TelemetryCard extends StatelessWidget {
         const Padding(
           padding: EdgeInsets.only(left: 17, top: 2),
           child: Text(
-            'ESP32',
+            'Sensor de suelo 7 en 1',
             style: TextStyle(
               color: Colors.white,
               fontSize: 16,

@@ -1,50 +1,55 @@
 erDiagram
-  PARCEL ||--o{ READING : records
-  PARCEL ||--o{ LAB_ANALYSIS : records
-
-  PARCEL {
-    uuid id PK
-    uuid farm_id FK
-    uuid crop_id FK
-    string name
-    float area_hectares
-  }
-  READING {
-    uuid id PK
-    uuid parcel_id FK
-    float nitrogen
-    float phosphorus
-    float potassium
-    float ec
-    float ph
-    float temperature
-    float humidity
-    timestamp recorded_at
-  }
-  LAB_ANALYSIS {
-    uuid id PK
-    uuid parcel_id FK
-    string sample_code
-    datetime sampled_at
-    float depth_start_cm
-    float depth_end_cm
-    float ph
-    string ph_method
-    float ec
-    string ec_method
-    float organic_matter_pct
-    float cic
-    float clay_pct
-    float silt_pct
-    float sand_pct
-    float nitrogen
-    float phosphorus
-    string phosphorus_method
-    float potassium
-    string potassium_method
-    float calcium
-    float magnesium
-    float sulfur
-    string lab
-    datetime recorded_at
-  }
+    %% SQLAlchemy models at main f986ccb; 2026-10-08.
+    PARCEL ||--o{ READING : parcel_id
+    PARCEL ||--o{ LAB_ANALYSIS : parcel_id
+    PARCEL {
+        uuid farm_id FK
+        uuid crop_id FK
+        uuid variety_id FK "nullable"
+        string name
+        float area_hectares
+        int plants_per_hectare "nullable"
+        date planting_date
+        uuid id PK
+        datetime created_at
+        datetime updated_at
+    }
+    READING {
+        uuid parcel_id FK
+        float nitrogen
+        float phosphorus
+        float potassium
+        float ec
+        float ph
+        float temperature
+        float humidity
+        datetime recorded_at
+        uuid id PK
+    }
+    LAB_ANALYSIS {
+        uuid parcel_id FK
+        string sample_code "nullable"
+        datetime sampled_at "nullable"
+        float depth_start_cm "nullable"
+        float depth_end_cm "nullable"
+        float ph
+        string ph_method "nullable"
+        float ec "nullable"
+        string ec_method "nullable"
+        float organic_matter_pct
+        float cic
+        float clay_pct
+        float silt_pct
+        float sand_pct
+        float nitrogen
+        float phosphorus
+        string phosphorus_method "nullable"
+        float potassium
+        string potassium_method "nullable"
+        float calcium
+        float magnesium
+        float sulfur
+        string lab
+        datetime recorded_at
+        uuid id PK
+    }

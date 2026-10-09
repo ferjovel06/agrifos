@@ -1,8 +1,10 @@
 ![Logo Agrifos](docs/Agrifos_Logo_V1.svg)
 
-# 🌱 Sistema de Asistencia Agrícola Inteligente
+# 🌱 Ágrifos — Sistema de Asistencia Agrícola Inteligente
 
-Sistema de asistencia agrícola compuesto por una plataforma digital interactiva que combina dos fuentes de datos del suelo: un **sensor NPK genérico conectado vía cable OTG** y la **captura manual de análisis de laboratorio**. A través de la aplicación móvil, el agricultor registra su finca y perfila sus parcelas seleccionando el tipo de planta y su etapa de crecimiento. Al conectar el sensor mediante cable OTG, la aplicación despliega un tablero de control en tiempo real con los niveles de NPK, conductividad eléctrica, pH, temperatura y humedad; alternativamente, el agricultor puede introducir manualmente los resultados de un análisis de laboratorio para una planificación de fertilización más completa.
+Documentación sincronizada el 8 de octubre de 2026 con `main` en `f986ccb` (PR #74). Alcance inicial: café; plataforma escalable a otros cultivos. Véase el [estado implementado](docs/ESTADO_IMPLEMENTADO.md).
+
+Sistema de asistencia agrícola compuesto por una plataforma digital interactiva que combina dos fuentes de datos del suelo: un **sensor de suelo genérico 7 en 1 conectado vía cable OTG** y la **captura manual de análisis de laboratorio**. A través de la aplicación móvil, el agricultor registra su finca y perfila sus parcelas seleccionando el tipo de planta y su etapa de crecimiento. Al conectar el sensor mediante cable OTG, la aplicación despliega un tablero de control en tiempo real con los niveles de NPK, conductividad eléctrica, pH, temperatura y humedad; alternativamente, el agricultor puede introducir manualmente los resultados de un análisis de laboratorio para una planificación de fertilización más completa.
 
 ## Tabla de contenidos
 - [Arquitectura](#arquitectura)
@@ -23,19 +25,17 @@ Sistema de asistencia agrícola compuesto por una plataforma digital interactiva
 
 ## Arquitectura
 
-![Arquitectura](docs/diagrams/architecture_diagram.png)
-
-> El PNG muestra la arquitectura objetivo del producto.
+La arquitectura implementada está en [architecture_diagram.mmd](docs/diagrams/architecture_diagram.mmd). Los recursos PNG/SVG anteriores son ilustraciones históricas del diseño objetivo; no sustituyen estos diagramas Mermaid ni los contratos del código.
 
 **Flujo de datos**
-1. **Sensor NPK genérico (OTG):** dispositivo comercial de sonda multiparamétrica (NPK, CE, pH, temperatura, humedad) que se conecta al teléfono/tablet mediante cable OTG (USB Serial/CDC).
-2. **App (Flutter):** detecta el sensor conectado por OTG, permite capturar análisis de laboratorio y consume la API REST. Supabase Auth gestiona registro, confirmación de correo, sesiones, recuperación de contraseña y MFA TOTP. Planificación incluye calendario mensual/semanal por finca, pronóstico de 7 días y alertas climáticas. Finanzas conserva una pantalla de demostración.
-3. **Backend (FastAPI):** valida los JWT de Supabase, aplica permisos por rol, persiste la información en PostgreSQL y expone los servicios de diagnóstico, fertilización, fenología y clima. Los modelos financieros existen, pero su router todavía no está publicado por la API.
+1. **Sensor de suelo genérico 7 en 1 (OTG):** dispositivo comercial de sonda multiparamétrica (NPK, CE, pH, temperatura, humedad) que se conecta al teléfono/tablet mediante cable OTG (USB Serial/CDC).
+2. **App (Flutter):** detecta el sensor conectado por OTG, permite capturar análisis de laboratorio y consume la API REST. Supabase Auth gestiona registro, confirmación de correo, sesiones, recuperación de contraseña y MFA TOTP. Planificación incluye calendario mensual/semanal por finca, pronóstico de 7 días y alertas climáticas. Finanzas permite gestionar ingresos y egresos y consultar métricas por finca desde la API.
+3. **Backend (FastAPI):** valida los JWT de Supabase, aplica permisos por rol, persiste la información en PostgreSQL y expone los servicios de diagnóstico, fertilización, fenología y clima. El router `/finances` está publicado y aplica autorización por finca.
 4. **Servicio externo de clima:** proveedor meteorológico de terceros consultado por el backend para generar alertas predictivas (lluvias, canículas, olas de calor).
-5. **Base de datos (PostgreSQL):** modelo relacional de 27 entidades, incluidas referencias agronómicas versionadas, etapas fenológicas normalizadas y recomendaciones de fertilización persistidas — ver [Modelo de datos](#modelo-de-datos) para el detalle completo.
+5. **Base de datos (PostgreSQL):** modelo relacional de 27 entidades de aplicación y la referencia externa a `auth.users`, incluidas referencias agronómicas versionadas, etapas fenológicas normalizadas y recomendaciones de fertilización persistidas — ver [Modelo de datos](#modelo-de-datos) para el detalle completo.
 
 ## Modelo de datos
-El diagrama ER completo del modelo (27 entidades, 41 relaciones) está versionado en [`docs/diagrams/er_diagrams/agrifos_er_diagram.mmd`](docs/diagrams/er_diagrams/agrifos_er_diagram.mmd) (formato [Mermaid](https://mermaid.live)). También se divide en vistas por módulo para facilitar su lectura:
+El diagrama ER completo del modelo (27 entidades de aplicación + `auth.users`, 42 relaciones) está versionado en [`docs/diagrams/er_diagrams/agrifos_er_diagram.mmd`](docs/diagrams/er_diagrams/agrifos_er_diagram.mmd) (formato [Mermaid](https://mermaid.live)). También se divide en vistas por módulo para facilitar su lectura:
 
 - [Estructura de finca](docs/diagrams/er_diagrams/er_core_farm.mmd)
 - [Datos de suelo](docs/diagrams/er_diagrams/er_soil_data.mmd)
@@ -49,7 +49,7 @@ El diagrama ER completo del modelo (27 entidades, 41 relaciones) está versionad
 
 | Grupo | Entidades |
 |---|---|
-| Usuarios y estructura de finca | `User`, `Farm`, `Parcel`, `Crop`, `Variety` |
+| Usuarios y estructura de finca | `AuthUser` (referencia externa Supabase), `User`, `Farm`, `Parcel`, `Crop`, `Variety` |
 | Datos de suelo | `Reading` (sensor OTG), `LabAnalysis` (laboratorio) |
 | Fenología | `PhenologicalStageTemplate` define el ciclo estándar y las etapas reutilizables de cada cultivo; `ParcelPhenologicalStage` registra las fechas estimadas y reales de cada parcela |
 | Referencias agronómicas versionadas | `AgronomicReferenceSet`, `SoilReferenceRange`, `FertilizerProduct`, `FertilizerProductNutrient`, `ApplicationScheduleRule`, `AgronomicParameter`, `OptimalRequirement`, `ExtractionIndex`, `VarietyFactor`, `StageFactor`, `SoilType`, `EfficiencyFactor` |
@@ -61,13 +61,13 @@ El diagrama ER completo del modelo (27 entidades, 41 relaciones) está versionad
 
 ### 1. Calculadora de Insumos (Motor de Recomendación Nutricional)
 
-Traduce los datos del suelo en recomendaciones de fertilización mediante dos vías. El motor implementado está orientado a **café**`, y calcula el balance de N, P y K según el contexto fenológico.
+Traduce los datos del suelo en recomendaciones de fertilización mediante dos vías. El motor implementado está orientado a **café**, y calcula el balance de N, P y K según el contexto fenológico.
 
-**Vía A — Basada en Sensores Genéricos 7 en 1 (Monitoreo Rápido y Dinámico)**
+**Vía A — Basada en Sensor de Suelo Genérico 7 en 1 (Monitoreo Rápido y Dinámico)**
 - **Parámetros utilizados:** Nitrógeno (N), Fósforo (P), Potasio (K), pH, Humedad, Temperatura y Conductividad Eléctrica (CE), leídos vía OTG.
 
 **Vía B — Basada en Análisis de Laboratorio (Planificación Estratégica)**
-- **Parámetros utilizados:** pH, Materia Orgánica (MO %), Capacidad de Intercambio Catiónico (CIC), Textura (arcilla, limo y arena), Macronutrientes (N, P, K) y Mesonutrientes críticos (Calcio, Magnesio y Azufre).
+- **Datos capturados:** pH, MO, CIC, textura, N, P, K, Ca, Mg y S, además de metadatos de muestreo y método. Capturar Ca/Mg/S no significa que el plan calcule sus déficits: el balance productivo integrado sigue limitado a N/P₂O₅/K₂O.
 
 ### 2. Inteligencia Climática y Alertas Predictivas
 
@@ -86,11 +86,9 @@ Traduce los datos del suelo en recomendaciones de fertilización mediante dos v�
 
 ### 4. Gestor de Operaciones y Finanzas de la Finca
 
-El alcance previsto es:
+El módulo integrado ofrece creación, consulta, edición y eliminación de ingresos y egresos por finca. El tablero calcula ingreso bruto, gastos, balance operativo y margen del mes hasta la fecha de corte, variación contra el periodo comparable anterior, proyección anual de ingresos y flujo mensual (6 meses por defecto; API: 2 a 12).
 
-- **Control de egresos:** registro de gastos operativos: semillas, fertilizantes, pago de peones (por día o por labor), alquiler de maquinaria y costos de transporte.
-- **Registro de ingresos y producción:** documentación del rendimiento de la cosecha (quintales o toneladas) y el precio de venta en el mercado al momento de la transacción.
-- **Dashboard de rentabilidad (utilidades):** cruza ingresos con gastos y muestra visualmente el costo de producción por manzana, el margen de ganancia neto y el punto de equilibrio, para que el agricultor sepa exactamente cuánto le quedó al final de la cosecha.
+La proyección anual extrapola los ingresos acumulados del año por los días transcurridos; no predice precios ni cosechas. `Production` existe como entidad, pero el router financiero actual no publica un CRUD de producción. Costo por manzana y punto de equilibrio no son métricas implementadas en este tablero.
 
 ## Documentación Técnica de Referencia
 
@@ -98,9 +96,9 @@ Los detalles completos del motor agronómico se distribuyen en los documentos de
 
 | Documento | Contenido |
 |---|---|
-| [`agrifos_engine_documentation.md`](docs/agrifos_engine_documentation.md) | Ecuaciones matemáticas del motor de balance de masa N-P-K, calibración de sensores, cascada de fertilizantes químicos y modelo de riesgo climático |
-| [`coffee_phenology_and_fertilization_engine.pdf`](docs/coffee_phenology_and_fertilization_engine.pdf) | Documento completo sobre fenología, motor de fertilización, ejemplos, validación, apéndices y referencias |
-| [`coffee_soil_laboratory_parameters.pdf`](docs/coffee_soil_laboratory_parameters.pdf) | Documento completo de rangos de laboratorio, criterios de interpretación, implementación y referencias |
+| [`agrifos_engine_documentation.md`](docs/agrifos_engine_documentation.md) | Ecuaciones y límites del motor implementado, escenarios minerales, evaluación orgánica y relación con clima |
+| [`coffee_phenology_and_fertilization_engine.pdf`](docs/coffee_phenology_and_fertilization_engine.pdf) | Referencia agronómica de diseño; contrastar su alcance con el estado implementado |
+| [`coffee_soil_laboratory_parameters.pdf`](docs/coffee_soil_laboratory_parameters.pdf) | Referencia de rangos y métodos; el catálogo no implica dosificación de todos los nutrientes |
 | [`guia_evaluador.md`](docs/guia_evaluador.md) | Instrucciones para activar el backend en Render, probar endpoints protegidos e instalar el APK |
 
 ## Motor de Cálculo
@@ -111,6 +109,8 @@ El motor agronómico combina los datos del suelo con el cultivo, la variedad, la
 - **Proceso:** normalización de unidades, evaluación del aporte del suelo, estimación del déficit y ajuste por eficiencia agronómica.
 - **Salidas:** diagnóstico por parámetro y recomendaciones de fertilización expresadas en unidades aplicables en campo.
 - **Alcance implementado:** café, con advertencias sobre calibración, métodos de laboratorio y límites de interpretación.
+
+Los estados del suelo se traducen en créditos configurados; no hay conversión universal de ppm a kg disponibles.
 
 Las ecuaciones, factores, supuestos, ejemplos y referencias se documentan en [`docs/agrifos_engine_documentation.md`](docs/agrifos_engine_documentation.md). El detalle fenológico y los rangos de laboratorio están en [`docs/coffee_phenology_and_fertilization_engine.pdf`](docs/coffee_phenology_and_fertilization_engine.pdf) y [`docs/coffee_soil_laboratory_parameters.pdf`](docs/coffee_soil_laboratory_parameters.pdf).
 
@@ -139,7 +139,7 @@ Las ecuaciones, factores, supuestos, ejemplos y referencias se documentan en [`d
 | `provider` | Gestión de estado |
 | `flutter_svg` | Renderizado del isotipo/logotipo de la marca |
 | `flutter_native_splash` (dev) | Generación del splash nativo de Android/iOS a partir de `assets/images/` |
-| `flutter_serial_communication` | Comunicación con el sensor NPK vía OTG/Serial |
+| `flutter_serial_communication` | Comunicación con el sensor de suelo genérico 7 en 1 vía OTG/Serial |
 | `geolocator` / `geocoding` | Ubicación y geocodificación de fincas |
 | `google_fonts` | Tipografías de la interfaz |
 | `flutter_map` | Renderizado de mapas OpenStreetMap para ubicar fincas y parcelas |
@@ -155,7 +155,7 @@ ENV=development                 # development | staging | production
 APP_DEBUG=true
 
 # Database
-DATABASE_URL=postgresql+asyncpg://postgres:example_password@127.0.0.1:54321/postgres
+DATABASE_URL=postgresql+asyncpg://postgres:example_password@127.0.0.1:54322/postgres
 
 DB_POOL_SIZE=10
 DB_POOL_RECYCLE_SECONDS=300
@@ -209,14 +209,14 @@ agrifos/
 │   │   │   ├── weather.py                    # Pronóstico por finca
 │   │   │   ├── alerts.py                     # Evaluación y consulta de alertas
 │   │   │   ├── phenology.py                # Calendario fenológico automatizado
-│   │   │   └── finances.py                 # Borrador; router aún no publicado
+│   │   │   └── finances.py                 # CRUD de ingresos/egresos y tablero por finca
 │   │   ├── services/
 │   │   │   ├── diagnostic_service.py      # Cruce lectura/análisis vs. requerimientos del cultivo
-│   │   │   ├── fertilization_service.py    # Balance de masa N-P-K, calibración de sensores,
-│   │   │   │                              # cascada química (DAP→Urea→KCl) y dosis orgánica
+│   │   │   ├── fertilization_service.py    # Balance de masa N-P-K, clasificación de entradas,
+│   │   │   │                              # escenarios minerales y evaluación orgánica de referencia
 │   │   │   ├── weather_service.py            # Obtención y validación del pronóstico
 │   │   │   ├── climate_alert_service.py      # Reglas de riesgo por lluvia y calor
-│   │   │   ├── phenology_service.py        # Proyección de fases fenológicas por cultivo
+│   │   │   ├── phenology_service.py        # Gestión de etapas fenológicas por parcela
 │   │   ├── integrations/
 │   │   │   └── weather_provider.py         # Cliente HTTP del proveedor meteorológico externo
 │   │   ├── repositories/           # Acceso a datos (consultas SQLAlchemy)
@@ -236,7 +236,7 @@ agrifos/
 │   │   ├── main.dart
 │   │   ├── core/                   # Config, temas, constantes
 │   │   ├── data/
-│   │   │   ├── sensor/             # Conexión OTG/Serial con el sensor NPK genérico
+│   │   │   ├── sensor/             # Conexión OTG/Serial con el sensor de suelo genérico 7 en 1
 │   │   │   └── api/                # Repositorios y cliente REST (http)
 │   │   ├── domain/                 # Entidades y casos de uso
 │   │   ├── presentation/
@@ -256,7 +256,7 @@ agrifos/
 │   ├── diagrams/                  # Diagramas del sistema
 │   │   ├── architecture_diagram.png
 │   │   ├── activity_diagram.png
-│   │   ├── class_diagram.svg
+│   │   ├── class_diagram.mmd
 │   │   ├── use_case_diagram.svg
 │   │   └── er_diagrams/           # Diagrama ER completo y vistas por módulo
 │   └── guia_evaluador.md          # Prueba de API y APK
@@ -279,7 +279,7 @@ uv run alembic upgrade head
 uv run fastapi dev app/main.py
 
 # Ejecutar pruebas
-uv run --with pytest pytest -v
+uv run python -m unittest discover -s tests -v
 
 # Crear una nueva migración
 uv run alembic revision --autogenerate -m "descripcion_del_cambio"
@@ -485,11 +485,24 @@ Respuesta:
 
 ## Referencias
 
-Los fundamentos matemáticos del motor de cálculo (balance de masa N-P-K, calibración de sensores 7 en 1, cascada de fertilizantes químicos y modelo de riesgo climático) están documentados en `docs/agrifos_engine_documentation.md`. Esa documentación se apoya, entre otras, en las siguientes fuentes:
+Los fundamentos matemáticos del motor de cálculo (balance de masa N-P-K, límites de sensores 7 en 1, cascada de fertilizantes químicos y modelo de riesgo climático) están documentados en `docs/agrifos_engine_documentation.md`. Esa documentación se apoya, entre otras, en las siguientes fuentes:
 
 1. FAO, *Fertilizers and their use: A pocket guide for extension officers*, 4.ª ed., Roma, 2000.
 2. J. S. Benton, *Plant Nutrition and Soil Fertility Manual*, 2.ª ed., CRC Press, 2012.
 3. CENICAFÉ, *Manual del Cafetero Colombiano*, vol. 2, Chinchiná, Colombia, 2013.
-4. CIMMYT, *Maize Production in the Tropics and Subtropics*, México D.F., 2015.
+Las referencias bibliográficas no equivalen a validación local de dosis. Los parámetros efectivos son los del conjunto agronómico activo y versionado.
 
 ---
+
+## Escenario Orgánico integrado
+
+`POST /fertilization/recommendations` acepta `include_organic: true`; `GET /fertilization/plans/latest` admite la misma capacidad como parámetro. El valor predeterminado es `false`, para conservar el comportamiento de consumidores anteriores. Flutter solicita esta capacidad.
+
+Orgánico muestra Bocashi, Biol y Compost de pulpa de café, cantidades de referencia y un balance de composición total. No constituye una receta aprobada: disponibilidad temporal desconocida, `can_apply: false`, sin calendario ejecutable. Los sólidos usan kg/ha (y equivalencia en t/ha); el biol usa L/ha, sin convertir litros a kg por una densidad supuesta.
+
+## Documentación mantenida
+
+- [Índice y fuentes de verdad](docs/README.md).
+- [Estado de módulos y límites](docs/ESTADO_IMPLEMENTADO.md).
+- [Arquitectura](docs/diagrams/architecture_diagram.mmd) y [actividad de fertilización](docs/diagrams/activity_diagram.mmd).
+- [Clases persistidas](docs/diagrams/class_diagram.mmd) y [ER completo](docs/diagrams/er_diagrams/agrifos_er_diagram.mmd).

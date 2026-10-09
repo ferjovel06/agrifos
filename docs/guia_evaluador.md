@@ -1,12 +1,14 @@
-# Guía de evaluación de Agrifos
+# Guía de evaluación de Ágrifos
+
+Base documental: `main` en `f986ccb` (PR #74), 8 de octubre de 2026. La versión del despliegue y del APK se comprueba durante la evaluación; no se presume actualizada por un merge.
 
 Esta guía permite activar la API desplegada, probar sus endpoints protegidos e instalar la aplicación Android.
 
 ## 1. Activar y verificar el backend
 
-Agrifos está desplegado en Render. En el plan gratuito, el servicio puede suspenderse después de un periodo sin tráfico, por lo que la primera solicitud puede tardar algunos segundos.
+Ágrifos está desplegado en Render. En el plan gratuito, el servicio puede suspenderse después de un periodo sin tráfico, por lo que la primera solicitud puede tardar algunos segundos.
 
-1. Abra la [portada de Agrifos API](https://agrifos-api.onrender.com/).
+1. Abra la [portada de Ágrifos API](https://agrifos-api.onrender.com/).
 2. Espere hasta que la portada indique que el servicio está disponible.
 3. Presione **Abrir Swagger UI** para consultar y probar los endpoints.
 
@@ -23,7 +25,7 @@ Una respuesta correcta de `/health` tiene esta estructura:
 {
   "status": "healthy",
   "service": "agrifos-api",
-  "version": "1.0.0-beta.2",
+  "version": "1.0.0-beta.3",
   "timestamp": "2026-09-04T18:30:00+00:00"
 }
 ```
@@ -114,10 +116,10 @@ Para comprobar los permisos, una cuenta `auditor` puede repetir consultas `GET`;
 
 ## 5. Instalar y probar el APK
 
-1. Abra [GitHub Releases de Agrifos](https://github.com/ferjovel06/agrifos/releases).
+1. Abra [GitHub Releases de Ágrifos](https://github.com/ferjovel06/agrifos/releases).
 2. Seleccione la prerelease más reciente y descargue el archivo `.apk` incluido en **Assets**.
 3. En el dispositivo Android, permita temporalmente la instalación desde la aplicación usada para descargar el archivo.
-4. Instale el APK y abra Agrifos.
+4. Instale el APK y abra Ágrifos.
 5. Cree una cuenta nueva para probar el flujo completo como `farmer`, o inicie sesión con la cuenta `auditor` proporcionada si solo desea comprobar las consultas de lectura.
 
 Recorrido móvil sugerido:
@@ -131,7 +133,7 @@ Recorrido móvil sugerido:
 - Captura manual de análisis de laboratorio.
 - Consulta del diagnóstico y del plan de fertilización completo.
 - Consulta del pronóstico y las alertas climáticas.
-- Conexión del sensor NPK mediante USB OTG, si el hardware está disponible.
+- Conexión del sensor de suelo genérico 7 en 1 mediante USB OTG, si el hardware está disponible.
 
 ## 6. Consideraciones para la evaluación
 
@@ -139,3 +141,13 @@ Recorrido móvil sugerido:
 - La primera llamada al backend puede ser más lenta mientras Render reactiva el servicio.
 - El sensor físico es opcional para revisar el resto del flujo; los análisis de laboratorio pueden ingresarse manualmente.
 - Las credenciales de evaluación son temporales y deben utilizarse únicamente para revisar esta entrega.
+
+## 7. Verificar las capacidades fusionadas
+
+- Comparar `/health` y `/openapi.json` con la compilación evaluada. `1.0.0-beta.3` es la versión declarada en esta base; no identifica por sí sola el commit desplegado.
+- Solicitar Orgánico con `include_organic: true` en POST y en GET del último plan. Comprobar el orden Económico/Bajo cloruro/Orgánico cuando corresponda, unidades kg y L, balance parcial y ausencia de aplicaciones ejecutables. Sin esa capacidad, verificar la respuesta compatible anterior.
+- Abrir Finanzas y registrar/editar/eliminar ingresos y egresos de prueba; consultar `/finances/dashboard?farm_id={farm_id}`. Comprobar balance y margen con importes conocidos, y valores nulos cuando no hay base para calcular porcentajes.
+- Confirmar que Ca/Mg/S del laboratorio no se presentan como dosis complementarias calculadas. La base fusionada mantiene el balance productivo NPK.
+- Verificar con otra cuenta que no puede consultar o modificar fincas ajenas salvo permisos globales de lectura aplicables. Mantener los casos de auditor sin escritura.
+
+Una demo con fixtures no valida conexión a Supabase, captura de sensor físico ni eficacia agronómica.

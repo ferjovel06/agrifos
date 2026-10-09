@@ -1,28 +1,40 @@
 erDiagram
-  FARM ||--o{ ALERT : triggers
-  PARCEL o|--o{ ALERT : scopes
-  FARM ||--o{ PARCEL : contains
-
-  FARM {
-    uuid id PK
-    uuid user_id FK
-    string name
-  }
-  PARCEL {
-    uuid id PK
-    uuid farm_id FK
-    string name
-  }
-  ALERT {
-    uuid id PK
-    uuid farm_id FK
-    uuid parcel_id FK
-    string type
-    string title
-    string message
-    string severity
-    date event_date
-    float risk_score
-    boolean is_active
-    timestamp created_at
-  }
+    %% SQLAlchemy models at main f986ccb; 2026-10-08.
+    FARM ||--o{ PARCEL : farm_id
+    FARM ||--o{ ALERT : farm_id
+    PARCEL o|--o{ ALERT : parcel_id
+    FARM {
+        uuid user_id FK
+        string name
+        float area_hectares
+        float latitude
+        float longitude
+        uuid id PK
+        datetime created_at
+        datetime updated_at
+    }
+    PARCEL {
+        uuid farm_id FK
+        uuid crop_id FK
+        uuid variety_id FK "nullable"
+        string name
+        float area_hectares
+        int plants_per_hectare "nullable"
+        date planting_date
+        uuid id PK
+        datetime created_at
+        datetime updated_at
+    }
+    ALERT {
+        uuid farm_id FK
+        uuid parcel_id FK "nullable"
+        string type
+        string title
+        string message
+        string severity
+        date event_date "nullable"
+        float risk_score "nullable"
+        bool is_active
+        datetime created_at
+        uuid id PK
+    }
